@@ -1,4 +1,4 @@
-import type { Arc, Library, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
+import type { Arc, FamilyRole, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
 export const THEME_PRESETS: { name: string; theme: Theme }[] = [
@@ -27,14 +27,20 @@ export const DEFAULT_TABS: TabConfig[] = [
 export const REL_PRESETS: Omit<RelType, 'id'>[] = [
   { label: 'Lover', emoji: '❤️', color: '#e63946' },
   { label: 'Crush', emoji: '💘', color: '#ff6fa5' },
-  { label: 'Spouse', emoji: '💍', color: '#c9184a' },
+  { label: 'Spouse', emoji: '💍', color: '#c9184a', family: 'spouse' },
   { label: 'Ex', emoji: '💔', color: '#9d4edd' },
   { label: 'Best friend', emoji: '🤞', color: '#f4a261' },
   { label: 'Friend', emoji: '🤝', color: '#2a9d8f' },
   { label: 'Family', emoji: '🏠', color: '#e9c46a' },
-  { label: 'Sibling', emoji: '👫', color: '#ddb34c' },
-  { label: 'Parent', emoji: '🧓', color: '#b08968' },
-  { label: 'Child', emoji: '🧒', color: '#c8a27a' },
+  { label: 'Sibling', emoji: '👫', color: '#ddb34c', family: 'sibling' },
+  { label: 'Parent', emoji: '🧓', color: '#b08968', family: 'parent' },
+  { label: 'Child', emoji: '🧒', color: '#c8a27a', family: 'child' },
+  { label: 'Adoptive parent', emoji: '🫶', color: '#a47148', family: 'adoptive-parent' },
+  { label: 'Adopted child', emoji: '🌱', color: '#bc8a5f', family: 'adoptive-child' },
+  { label: 'Aunt / Uncle', emoji: '🧑‍🦳', color: '#c2a878' },
+  { label: 'Cousin', emoji: '🧑‍🤝‍🧑', color: '#d4b483' },
+  { label: 'Dragon bond', emoji: '🐉', color: '#2d6a4f' },
+  { label: 'Suspect', emoji: '🔎', color: '#6d597a' },
   { label: 'Mentor', emoji: '🧭', color: '#3a86ff' },
   { label: 'Student', emoji: '📖', color: '#5fa8ff' },
   { label: 'Colleague', emoji: '💼', color: '#6c757d' },
@@ -46,7 +52,7 @@ export const REL_PRESETS: Omit<RelType, 'id'>[] = [
   { label: "Doesn't know", emoji: '❔', color: '#adb5bd' },
 ];
 
-const DEFAULT_REL_LABELS = ['Lover', 'Crush', 'Friend', 'Family', 'Mentor', 'Rival', 'Enemy', 'Complicated', 'Acquaintance', "Doesn't know"];
+const DEFAULT_REL_LABELS = ['Lover', 'Crush', 'Friend', 'Family', 'Parent', 'Child', 'Sibling', 'Spouse', 'Mentor', 'Rival', 'Enemy', 'Complicated', 'Acquaintance', "Doesn't know"];
 
 export const defaultRelTypes = (): RelType[] =>
   REL_PRESETS.filter((p) => DEFAULT_REL_LABELS.includes(p.label)).map((p) => ({ ...p, id: uid() }));
@@ -57,6 +63,7 @@ export const SECTION_KINDS: { kind: SectionKind; label: string; hint: string }[]
   { kind: 'text', label: 'Text', hint: 'Free writing — backstory, notes…' },
   { kind: 'tags', label: 'Tags', hint: 'Short chips — traits, likes, dislikes' },
   { kind: 'images', label: 'Images', hint: 'Reference pictures, outfits, moodboard' },
+  { kind: 'quotes', label: 'Quotes & voice', hint: 'Signature lines and how they talk' },
 ];
 
 export function makeSection(kind: SectionKind, title?: string): Section {
@@ -75,6 +82,10 @@ export function makeSection(kind: SectionKind, title?: string): Section {
     base.images = [];
     base.width = 'full';
   }
+  if (kind === 'quotes') {
+    base.quotes = [];
+    base.voice = '';
+  }
   return base;
 }
 
@@ -87,6 +98,7 @@ export function defaultCharacterTemplate(): Section[] {
     { ...makeSection('stats', 'Personality'), stats: stats(['Courage', 'Kindness', 'Intelligence', 'Humour', 'Temper']) },
     makeSection('tags', 'Traits'),
     { ...makeSection('facts', 'Motivations'), facts: facts(['Goal', 'Fear', 'Secret', 'Flaw']) },
+    makeSection('quotes', 'Voice & quotes'),
     makeSection('text', 'Appearance'),
     makeSection('text', 'Backstory'),
   ];
@@ -102,6 +114,8 @@ export function cloneSectionShape(s: Section): Section {
     stats: s.stats?.map((f) => ({ id: uid(), label: f.label, value: 5 })),
     tags: s.kind === 'tags' ? [] : undefined,
     images: s.kind === 'images' ? [] : undefined,
+    quotes: s.kind === 'quotes' ? [] : undefined,
+    voice: s.kind === 'quotes' ? '' : undefined,
   };
 }
 
@@ -155,6 +169,27 @@ export function defaultQuestions(): Question[] {
   ];
 }
 
+export const defaultMoments = (): Moment[] => ['Beginning', 'Middle', 'End'].map((label) => ({ id: uid(), label }));
+
+export const defaultMeters = (): MeterDef[] => [
+  { id: uid(), label: 'Trust', color: '#2a9d8f' },
+  { id: uid(), label: 'Affection', color: '#e63946' },
+  { id: uid(), label: 'Tension', color: '#f77f00' },
+  { id: uid(), label: 'Attraction', color: '#d0567a' },
+];
+
+/** Guesses a family-tree role from a type's name, for types made before roles existed. */
+export function inferFamily(label: string): FamilyRole | undefined {
+  const l = label.toLowerCase();
+  if (/adopt.*(parent|mother|father|mum|mom|dad)/.test(l)) return 'adoptive-parent';
+  if (/adopt.*(child|son|daughter)/.test(l)) return 'adoptive-child';
+  if (/^(parent|mother|father|mum|mom|dad)s?$/.test(l)) return 'parent';
+  if (/^(child|son|daughter|kid)s?$/.test(l)) return 'child';
+  if (/^(sibling|brother|sister|twin)s?$/.test(l)) return 'sibling';
+  if (/^(spouse|husband|wife|married|partner)$/.test(l)) return 'spouse';
+  return undefined;
+}
+
 export function defaultArcs(): Arc[] {
   return [
     { id: uid(), title: 'Main Arc', description: '', color: '#e76f51', points: [] },
@@ -201,6 +236,9 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     characterTemplate: defaultCharacterTemplate(),
     relTypes: defaultRelTypes(),
     relationships: [],
+    moments: defaultMoments(),
+    relMeters: defaultMeters(),
+    characterArcs: {},
     arcs: defaultArcs(),
     worldImages: [],
     questions: defaultQuestions(),
@@ -226,6 +264,16 @@ export function normalizeStory(raw: Partial<Story>): Story {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
+  if (!Array.isArray(s.moments) || !s.moments.length) s.moments = defaultMoments();
+  if (!Array.isArray(s.relMeters)) s.relMeters = defaultMeters();
+  if (!s.characterArcs || typeof s.characterArcs !== 'object') s.characterArcs = {};
+  s.relTypes = s.relTypes.map((t) => (t.family || !inferFamily(t.label) ? t : { ...t, family: inferFamily(t.label) }));
+  // older relationships had a single type and feeling: move them to the first moment
+  s.relationships = s.relationships.map((r: any) => {
+    if (r.states && typeof r.states === 'object') return r;
+    const { typeId, feeling, ...rest } = r;
+    return { ...rest, notes: r.notes ?? '', states: { [s.moments[0].id]: { typeIds: typeId ? [typeId] : [], feeling: feeling ?? '', values: {} } } };
+  });
   return s;
 }
 

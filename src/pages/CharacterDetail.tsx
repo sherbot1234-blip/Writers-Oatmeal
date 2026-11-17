@@ -7,6 +7,9 @@ import { Avatar, ColorPick, Field, ImagePick, Lightbox } from '../components/ui'
 import { SectionList } from '../components/Sections';
 import { Links } from '../components/Links';
 import { cloneSectionShape } from '../defaults';
+import { stateAt, typesOf } from '../relations';
+import { uid } from '../util';
+import type { CharArc } from '../types';
 
 export default function CharacterDetail() {
   const { story, upd, base, universe } = useStoryCtx();
@@ -15,6 +18,7 @@ export default function CharacterDetail() {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const [zoom, setZoom] = useState(false);
+  const [eraId, setEraId] = useState<string | null>(null);
   const idx = story.characters.findIndex((c) => c.id === charId);
   const c = story.characters[idx];
 
@@ -32,10 +36,18 @@ export default function CharacterDetail() {
   const next = story.characters[idx + 1];
   const relsOut = story.relationships.filter((r) => r.from === c.id);
   const relsIn = story.relationships.filter((r) => r.to === c.id);
-  const typeOf = (id: string) => story.relTypes.find((t) => t.id === id);
+  const last = story.moments.length - 1;
+  const latest = (r: (typeof story.relationships)[number] | undefined) => typesOf(story, stateAt(r, story.moments, last)?.state);
   const nameOf = (id: string) => story.characters.find((x) => x.id === id);
   const isShared = story.sharedCharacterIds.includes(c.id);
   const usedIn = story.kind === 'universe' ? storiesUsing(lib, c.id) : isShared ? storiesUsing(lib, c.id) : [];
+
+  const eras = c.eras ?? [];
+  const era = eras.find((e) => e.id === eraId);
+  const shownImage = era?.image ?? c.image;
+  const arc: CharArc = story.characterArcs[c.id] ?? { start: '', change: '', end: '' };
+  const setArc = (k: keyof CharArc, v: string) => upd((s) => void (s.characterArcs[c.id] = { ...(s.characterArcs[c.id] ?? { start: '', change: '', end: '' }), [k]: v }));
+  const appearances = story.arcs.flatMap((a) => a.points.filter((p) => p.characterIds.includes(c.id)).map((p) => ({ arc: a, p })));
 
   const addMissing = () => {
     const have = new Set(c.sections.map((s) => s.title.trim().toLowerCase()));
@@ -73,17 +85,26 @@ export default function CharacterDetail() {
 
       <div className="char-hero card" style={{ borderColor: c.color }}>
         <div className="char-portrait" style={{ borderColor: c.color }}>
-          {c.image ? <img src={c.image} alt="" onClick={() => setZoom(true)} /> : <Avatar c={c} size={140} />}
-          <div className="char-portrait-actions">
+          {shownImage ? <img src={shownImage} alt="" onClick={() => setZoom(true)} /> : <Avatar c={c} size={140} />}
+          {!era && <div className="char-portrait-actions">
             <ImagePick className="btn small" maxDim={1000} onPick={([src]) => edit((ch) => void (ch.image = src))}>
               {c.image ? 'Change' : 'Add picture'}
             </ImagePick>
             {c.image && <button className="btn small ghost" onClick={() => edit((ch) => void (ch.image = undefined))}>Remove</button>}
-          </div>
+          </div>}
         </div>
         <div className="char-hero-text">
           <Field className="h-title" value={c.name} placeholder="Character name" onChange={(v) => edit((ch) => void (ch.name = v))} />
           <Field className="h-tagline" value={c.role} placeholder="Role — protagonist, the mentor, comic relief…" onChange={(v) => edit((ch) => void (ch.role = v))} />
+          {eras.length > 0 && (
+            <div className="era-switch" role="tablist" aria-label="Looks and eras">
+              <button className={!era ? 'on' : ''} onClick={() => setEraId(null)}>Main</button>
+              {eras.map((e) => (
+                <button key={e.id} className={era?.id === e.id ? 'on' : ''} onClick={() => setEraId(e.id)}>{e.name || 'Untitled look'}</button>
+              ))}
+            </div>
+          )}
+          {era?.description && <p className="era-desc small">{era.description}</p>}
           <Links links={c.links ?? []} onChange={(l) => edit((ch) => void (ch.links = l))} />
           <div className="row gap wrap" style={{ marginTop: 8 }}>
             <span className="row gap small">Colour <ColorPick value={c.color} onChange={(v) => edit((ch) => void (ch.color = v))} /></span>
@@ -159,11 +180,94 @@ export default function CharacterDetail() {
         </div>
       </div>
 
+      <section className="card eras-block">
+        <div className="row between wrap gap">
+          <h2 className="sec-title">Looks & eras</h2>
+          <button
+            className="btn small"
+            onClick={() => {
+              const id = uid();
+              edit((ch) => void (ch.eras ??= []).push({ id, name: '', description: '' }));
+              setEraId(id);
+            }}
+          >
+            + Add a look / era
+          </button>
+        </div>
+        {eras.length === 0 ? (
+          <p className="muted small">Different versions of {c.name || 'this character'}: younger, after the time-skip, in disguise, a signature outfit… Each gets its own picture.</p>
+        ) : (
+          <div className="era-grid">
+            {eras.map((e, i) => (
+              <div key={e.id} className={'era-card' + (era?.id === e.id ? ' on' : '')} onClick={() => setEraId(e.id)} style={{ ['--cc' as any]: c.color }}>
+                <div className="era-img" style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
+                  {!e.image && <span className="muted small">No picture</span>}
+                  <ImagePick className="btn small era-pick" maxDim={1000} onPick={([src]) => edit((ch) => void (ch.eras![i].image = src))}>{e.image ? '↻' : '+ Picture'}</ImagePick>
+                </div>
+                <Field multiline className="era-name" value={e.name} placeholder="e.g. Age 12 · After the war" onChange={(v) => edit((ch) => void (ch.eras![i].name = v))} />
+                <Field multiline className="small" value={e.description} placeholder="What's different about them now?" onChange={(v) => edit((ch) => void (ch.eras![i].description = v))} />
+                <div className="row end">
+                  <button className="icon-btn tiny" title="Earlier" onClick={(ev) => { ev.stopPropagation(); edit((ch) => { const a = ch.eras!; if (i > 0) [a[i - 1], a[i]] = [a[i], a[i - 1]]; }); }}>←</button>
+                  <button
+                    className="icon-btn tiny danger"
+                    title="Delete look"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      if (!confirm(`Delete the look “${e.name || 'untitled'}”?`)) return;
+                      if (era?.id === e.id) setEraId(null);
+                      edit((ch) => void ch.eras!.splice(i, 1));
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <SectionList accent={c.color} sections={c.sections} edit={(fn) => edit((ch) => fn(ch.sections))} />
+
+      {story.kind === 'story' && (
+        <section className="card char-arc" style={{ marginTop: 16, ['--cc' as any]: c.color }}>
+          <h2 className="sec-title">Arc in this story</h2>
+          <div className="arc-steps">
+            <div className="arc-step">
+              <span className="arc-step-label">Starts as</span>
+              <Field multiline value={arc.start} placeholder="Who are they at the beginning? What do they believe?" onChange={(v) => setArc('start', v)} />
+            </div>
+            <span className="arc-arrow" aria-hidden>→</span>
+            <div className="arc-step">
+              <span className="arc-step-label">Turning point</span>
+              <Field multiline value={arc.change} placeholder="What forces them to change?" onChange={(v) => setArc('change', v)} />
+            </div>
+            <span className="arc-arrow" aria-hidden>→</span>
+            <div className="arc-step">
+              <span className="arc-step-label">Ends as</span>
+              <Field multiline value={arc.end} placeholder="Who are they by the end?" onChange={(v) => setArc('end', v)} />
+            </div>
+          </div>
+          <h3 className="arc-sub small">Plot points with {c.name || 'this character'}</h3>
+          {appearances.length === 0 ? (
+            <p className="muted small">None yet. On the <Link to={base + '/plot'}>Plot</Link> page, tag {c.name || 'them'} in a plot point and it shows up here.</p>
+          ) : (
+            <ol className="appearances">
+              {appearances.map(({ arc: a, p }) => (
+                <li key={p.id} style={{ borderLeftColor: a.color }}>
+                  <span className="muted small">{a.title}{p.chapter ? ` · ${p.chapter}` : ''}</span>
+                  <b>{p.title || 'Untitled'}</b>
+                  <span title={p.status}>{p.status === 'written' ? '✅' : p.status === 'planned' ? '📝' : '💭'}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       <section className="card" style={{ marginTop: 16 }}>
         <div className="row between">
-          <h2 className="sec-title">Relationships</h2>
+          <h2 className="sec-title">Relationships {story.moments.length > 1 && <span className="muted small">(by “{story.moments[last].label}”)</span>}</h2>
           <Link className="btn small" to={`${base}/relationships?focus=${c.id}`}>Open in relationships →</Link>
         </div>
         {relsOut.length + relsIn.length === 0 ? (
@@ -175,8 +279,10 @@ export default function CharacterDetail() {
               .map((o) => {
                 const out = relsOut.find((r) => r.to === o.id);
                 const inn = relsIn.find((r) => r.from === o.id);
-                const to = out && typeOf(out.typeId);
-                const ti = inn && typeOf(inn.typeId);
+                const to = latest(out);
+                const ti = latest(inn);
+                const badges = (ts: typeof to) =>
+                  ts.length ? ts.map((t) => <span key={t.id} className="badge" style={{ background: t.color }}>{t.emoji} {t.label}</span>) : <span className="muted">—</span>;
                 return (
                   <div key={o.id} className="rel-mini-row">
                     <Avatar c={nameOf(o.id)!} size={28} />
@@ -184,11 +290,11 @@ export default function CharacterDetail() {
                     <span className="small rel-mini-dirs">
                       <span>
                         <span className="muted">sees them as </span>
-                        {to ? <span className="badge" style={{ background: to.color }}>{to.emoji} {to.label}</span> : <span className="muted">—</span>}
+                        {badges(to)}
                       </span>
                       <span>
                         <span className="muted">they see {c.name || 'them'} as </span>
-                        {ti ? <span className="badge" style={{ background: ti.color }}>{ti.emoji} {ti.label}</span> : <span className="muted">—</span>}
+                        {badges(ti)}
                       </span>
                     </span>
                   </div>
@@ -197,7 +303,7 @@ export default function CharacterDetail() {
           </div>
         )}
       </section>
-      {zoom && c.image && <Lightbox src={c.image} caption={c.name} onClose={() => setZoom(false)} />}
+      {zoom && shownImage && <Lightbox src={shownImage} caption={era ? `${c.name} · ${era.name}` : c.name} onClose={() => setZoom(false)} />}
     </div>
   );
 }

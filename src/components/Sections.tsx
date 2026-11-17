@@ -191,6 +191,31 @@ function SectionCard({
             </ImagePick>
           </div>
         ))}
+      {sec.kind === 'quotes' &&
+        (templateMode ? (
+          <p className="muted small">Signature quotes and voice notes, filled in per character.</p>
+        ) : (
+          <div className="quotes">
+            <Field
+              multiline
+              className="small voice"
+              value={sec.voice ?? ''}
+              placeholder="How do they talk? Accent, pet words, formal or blunt, what they never say…"
+              onChange={(v) => edit((s) => void (s.voice = v))}
+            />
+            {(sec.quotes ?? []).map((q, i) => (
+              <figure key={q.id} className="quote" style={{ borderLeftColor: accent }}>
+                <Field multiline className="quote-text" value={q.text} placeholder="“A line only they would say…”" onChange={(v) => edit((s) => void (s.quotes![i].text = v))} />
+                <figcaption className="row gap">
+                  <span aria-hidden>—</span>
+                  <Field className="small muted-field" value={q.context} placeholder="to whom / when (optional)" onChange={(v) => edit((s) => void (s.quotes![i].context = v))} />
+                  <button className="icon-btn tiny danger" title="Remove quote" onClick={() => edit((s) => void s.quotes!.splice(i, 1))}>×</button>
+                </figcaption>
+              </figure>
+            ))}
+            <button className="btn small ghost" onClick={() => edit((s) => void (s.quotes ??= []).push({ id: uid(), text: '', context: '' }))}>+ Quote</button>
+          </div>
+        ))}
       {lightbox && <Lightbox src={lightbox} onClose={() => setLightbox(null)} />}
     </section>
   );
