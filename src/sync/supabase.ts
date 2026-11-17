@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { get, set } from 'idb-keyval';
 import type { Backend, LocalCache, RemoteDoc } from './engine';
+import { BUILT_IN_SUPABASE } from '../config';
 
 export interface CloudConfig {
   url: string;
@@ -10,19 +11,25 @@ export interface CloudConfig {
 const LS_KEY = 'wo-cloud-config';
 const BUCKET = 'images';
 
-/** Build-time config (GitHub repo variables) wins; otherwise what was pasted into the app. */
+/** People often paste the API address (…/rest/v1/); the client wants just the project address. */
+export const cleanUrl = (u: string) => u.trim().replace(/\/(rest|auth|storage)\/v1\/?.*$/, '').replace(/\/+$/, '');
+
+/** Order of preference: GitHub repo variables, then the address built into the site, then one pasted into the app. */
 export function getConfig(): CloudConfig | null {
   const env = import.meta.env as Record<string, string | undefined>;
-  if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_KEY) return { url: env.VITE_SUPABASE_URL, key: env.VITE_SUPABASE_KEY };
+  if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_KEY) return { url: cleanUrl(env.VITE_SUPABASE_URL), key: env.VITE_SUPABASE_KEY };
+  if (BUILT_IN_SUPABASE.url && BUILT_IN_SUPABASE.key) return { url: cleanUrl(BUILT_IN_SUPABASE.url), key: BUILT_IN_SUPABASE.key };
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as CloudConfig) : null;
+    const c = raw ? (JSON.parse(raw) as CloudConfig) : null;
+    return c ? { ...c, url: cleanUrl(c.url) } : null;
   } catch {
     return null;
   }
 }
 
-export const configFromBuild = () => !!(import.meta.env as Record<string, string | undefined>).VITE_SUPABASE_URL;
+export const configFromBuild = () =>
+  !!(import.meta.env as Record<string, string | undefined>).VITE_SUPABASE_URL || !!(BUILT_IN_SUPABASE.url && BUILT_IN_SUPABASE.key);
 
 export function saveConfig(c: CloudConfig | null) {
   try {
@@ -40,7 +47,7 @@ export function getClient(): SupabaseClient | null {
   const c = getConfig();
   if (!c) return null;
   try {
-    client = createClient(c.url.trim().replace(/\/$/, ''), c.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } });
+    client = createClient(cleanUrl(c.url), c.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } });
   } catch {
     return null;
   }
