@@ -21,10 +21,12 @@ Each story looks completely different from the others. **Milanote** stays my mai
 - [x] Songs: Spotify + YouTube players
 - [x] Cloud sync (Supabase): private login, images in private storage, conflict copies
 - [x] Milanote / outside links on stories and characters
+- [x] Bookshelf library (spines and covers), story status, search and status filters, sorting
+- [x] Universes / series: series order, shared characters (edit once, shows in every story), universe-level world, songs and relationships
 
 ## Next, in order
 
-1. **Bookshelf + universes**: bookshelf-style library (spines and covers), story status (idea → finished / on hold), search, series/universes with **shared characters and places** across stories.
+1. *(done)* Still to come for universes: shared **places** (arrives with the world wiki in step 5).
 2. **Characters & relationships**: looks/eras per character, quotes & voice, character arc linked to plot points; relationships with multiple labels, intensity meters (trust, affection, tension, attraction), changes over time (timeline slider), auto family tree.
 3. **Writing & plot**: chapter editor with formatting, a side panel (characters/plot/world while writing), comments and notes; plot timeline with arc lanes; structure templates (Three-Act, Save the Cat, Hero's Journey, Kishōtenketsu); plot points ↔ chapters.
 4. **Music**: theme songs on character cards, songs per scene or chapter, **Spotify playlist import** (I have Premium).

@@ -7,6 +7,7 @@ import { THEME_PRESETS } from '../defaults';
 import { download, ensureFonts, FONT_OPTIONS, fontStack, move, slug, uid } from '../util';
 import type { Theme } from '../types';
 import { themeVars } from './Library';
+import { deleteUniverse } from '../universe';
 
 const COLOR_FIELDS: { key: keyof Theme; label: string }[] = [
   { key: 'bg', label: 'Background' },
@@ -18,7 +19,9 @@ const COLOR_FIELDS: { key: keyof Theme; label: string }[] = [
 
 export default function Settings() {
   const { story, upd } = useStoryCtx();
-  const { update } = useLibrary();
+  const { lib, update } = useLibrary();
+  const isUniverse = story.kind === 'universe';
+  const noun = isUniverse ? 'universe' : 'story';
   const nav = useNavigate();
   const t = story.theme;
   const setTheme = (patch: Partial<Theme>) => upd((s) => void Object.assign(s.theme, patch));
@@ -121,28 +124,43 @@ export default function Settings() {
       </section>
 
       <section className="card">
-        <h2 className="sec-title">Story data</h2>
+        <h2 className="sec-title">{isUniverse ? 'Universe data' : 'Story data'}</h2>
         <div className="row gap wrap">
-          <button className="btn" onClick={() => download(`${slug(story.title)}.json`, story)}>Export this story</button>
           <button
             className="btn"
-            onClick={() => {
-              const copy = { ...structuredClone(story), id: uid(), title: story.title + ' (copy)', createdAt: Date.now(), updatedAt: Date.now() };
-              update((d) => void d.stories.unshift(copy));
-              nav('/story/' + copy.id);
-            }}
+            // exported stories are self-contained: shared characters come along as normal characters
+            onClick={() => download(`${slug(story.title)}.json`, { ...story, universeId: undefined, sharedCharacterIds: [] })}
           >
-            Duplicate story
+            Export this {noun}
           </button>
+          {!isUniverse && (
+            <button
+              className="btn"
+              onClick={() => {
+                const own = lib.stories.find((s) => s.id === story.id)!;
+                const copy = { ...structuredClone(own), id: uid(), title: story.title + ' (copy)', createdAt: Date.now(), updatedAt: Date.now() };
+                update((d) => void d.stories.unshift(copy));
+                nav('/story/' + copy.id);
+              }}
+            >
+              Duplicate story
+            </button>
+          )}
           <button
             className="btn danger"
             onClick={() => {
-              if (!confirm(`Delete “${story.title}” forever? Export it first if you might want it back.`)) return;
+              const msg = isUniverse
+                ? `Delete the universe “${story.title}”? Its stories are kept, and each keeps its own copy of the shared characters it uses.`
+                : `Delete “${story.title}” forever? Export it first if you might want it back.`;
+              if (!confirm(msg)) return;
               nav('/');
-              update((d) => void (d.stories = d.stories.filter((s) => s.id !== story.id)));
+              update((d) => {
+                if (isUniverse) deleteUniverse(d, story.id);
+                else d.stories = d.stories.filter((s) => s.id !== story.id);
+              });
             }}
           >
-            Delete story
+            Delete {noun}
           </button>
         </div>
       </section>

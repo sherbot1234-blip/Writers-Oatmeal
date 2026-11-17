@@ -32,6 +32,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="world" element={<World />} />
             <Route path="settings" element={<Settings />} />
           </Route>
+          <Route path="/universe/:storyId" element={<StoryLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="songs" element={<Songs />} />
+            <Route path="characters" element={<Characters />} />
+            <Route path="characters/:charId" element={<CharacterDetail />} />
+            <Route path="relationships" element={<Relationships />} />
+            <Route path="plot" element={<Plot />} />
+            <Route path="world" element={<World />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
           <Route path="*" element={<LibraryPage />} />
         </Routes>
       </HashRouter>

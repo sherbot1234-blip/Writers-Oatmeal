@@ -45,11 +45,17 @@ export interface LocalCache {
   setImage(hash: string, dataUrl: string): Promise<void>;
 }
 
+export type Kind = 'story' | 'universe';
+const coll = (k: Kind) => (k === 'universe' ? 'universes' : 'stories');
+/** Remote/tombstone id: stories keep their id (backwards compatible), universes get a prefix. */
+export const docId = (k: Kind, id: string) => (k === 'universe' ? 'u:' + id : id);
+const parseDocId = (d: string): [Kind, string] => (d.startsWith('u:') ? ['universe', d.slice(2)] : ['story', d]);
+
 export interface Changes {
-  /** Stories to put into the library, with the local version they're allowed to replace. */
-  upserts: { story: Story; ifLocalVersion: number | undefined }[];
-  removes: { id: string; ifLocalVersion: number | undefined }[];
-  conflictCopies: Story[];
+  /** Stories/universes to put into the library, with the local version they're allowed to replace. */
+  upserts: { kind: Kind; story: Story; ifLocalVersion: number | undefined }[];
+  removes: { kind: Kind; id: string; ifLocalVersion: number | undefined }[];
+  conflictCopies: { kind: Kind; story: Story }[];
   meta?: { siteTitle: string; metaUpdatedAt: number; ifLocalVersion: number };
 }
 
@@ -139,7 +145,10 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
   const remote = new Map(remoteList.map((r) => [r.id, r]));
   const synced = await cache.getSynced();
   const uploaded = new Set(await cache.getUploaded());
-  const local = new Map(lib.stories.map((s) => [s.id, s]));
+  const local = new Map<string, Story>([
+    ...lib.stories.map((s) => [docId('story', s.id), s] as const),
+    ...(lib.universes ?? []).map((u) => [docId('universe', u.id), u] as const),
+  ]);
   const tomb = lib.tombstones ?? {};
 
   const changes: Changes = { upserts: [], removes: [], conflictCopies: [] };
@@ -151,6 +160,7 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
   ids.delete(META_ID);
 
   for (const id of ids) {
+    const [kind] = parseDocId(id);
     const L = local.get(id);
     const T = L ? undefined : tomb[id];
     const R = remote.get(id);
@@ -169,7 +179,7 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
       toPush.push({ id, story: L, version: localVer! });
     } else if (!localChanged && remoteChanged) {
       if (R.deleted) {
-        if (L) changes.removes.push({ id, ifLocalVersion: L.updatedAt });
+        if (L) changes.removes.push({ kind, id: L.id, ifLocalVersion: L.updatedAt });
         synced[id] = R.updated_at;
       } else toPull.push(id);
     } else {
@@ -182,7 +192,7 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
         toPull.push(id);
         conflicts++;
         const stamp = new Date(L.updatedAt).toLocaleString();
-        changes.conflictCopies.push({ ...L, id: uid(), title: `${L.title} (conflict copy, ${stamp})` });
+        changes.conflictCopies.push({ kind, story: { ...L, id: uid(), title: `${L.title} (conflict copy, ${stamp})` } });
       }
     }
   }
@@ -206,11 +216,13 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
         const m = (d.data ?? {}) as { siteTitle?: string };
         changes.meta = { siteTitle: m.siteTitle || lib.siteTitle, metaUpdatedAt: d.updated_at, ifLocalVersion: lMetaVer };
       } else {
+        const [kind, realId] = parseDocId(d.id);
         const data = await restoreImages(d.data, backend, cache, uploaded);
         const story = normalizeStory(data as Partial<Story>);
-        story.id = d.id;
+        story.id = realId;
+        story.kind = kind;
         story.updatedAt = d.updated_at;
-        changes.upserts.push({ story, ifLocalVersion: local.get(d.id)?.updatedAt });
+        changes.upserts.push({ kind, story, ifLocalVersion: local.get(d.id)?.updatedAt });
       }
       synced[d.id] = d.updated_at;
     }
@@ -234,16 +246,19 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
 
 /** Applies remote changes to the newest local library, skipping anything edited locally meanwhile. */
 export function applyChanges(lib: Library, c: Changes): Library {
-  const stories = [...lib.stories];
+  const next: Library = { ...lib, stories: [...lib.stories], universes: [...(lib.universes ?? [])] };
   for (const u of c.upserts) {
-    const i = stories.findIndex((s) => s.id === u.story.id);
+    const arr = next[coll(u.kind)];
+    const i = arr.findIndex((s) => s.id === u.story.id);
     if (i >= 0) {
-      if (stories[i].updatedAt === u.ifLocalVersion) stories[i] = u.story;
-    } else if (u.ifLocalVersion === undefined) stories.push(u.story);
+      if (arr[i].updatedAt === u.ifLocalVersion) arr[i] = u.story;
+    } else if (u.ifLocalVersion === undefined) arr.push(u.story);
   }
-  const removeIds = new Set(c.removes.filter((r) => stories.find((s) => s.id === r.id)?.updatedAt === r.ifLocalVersion).map((r) => r.id));
-  const kept = stories.filter((s) => !removeIds.has(s.id));
-  const next: Library = { ...lib, stories: [...kept, ...c.conflictCopies] };
+  for (const r of c.removes) {
+    const k = coll(r.kind);
+    next[k] = next[k].filter((s) => !(s.id === r.id && s.updatedAt === r.ifLocalVersion));
+  }
+  for (const cc of c.conflictCopies) next[coll(cc.kind)].push(cc.story);
   if (c.meta && (lib.metaUpdatedAt ?? 0) === c.meta.ifLocalVersion) {
     next.siteTitle = c.meta.siteTitle;
     next.metaUpdatedAt = c.meta.metaUpdatedAt;

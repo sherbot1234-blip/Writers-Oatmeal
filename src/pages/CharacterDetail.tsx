@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useStoryCtx } from '../storyContext';
+import { pathFor, useStoryCtx } from '../storyContext';
+import { useLibrary } from '../store';
+import { deleteUniverseCharacter, shareCharacter, storiesUsing } from '../universe';
 import { Avatar, ColorPick, Field, ImagePick, Lightbox } from '../components/ui';
 import { SectionList } from '../components/Sections';
 import { Links } from '../components/Links';
 import { cloneSectionShape } from '../defaults';
 
 export default function CharacterDetail() {
-  const { story, upd } = useStoryCtx();
+  const { story, upd, base, universe } = useStoryCtx();
+  const { lib, update } = useLibrary();
   const { charId } = useParams();
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const [zoom, setZoom] = useState(false);
   const idx = story.characters.findIndex((c) => c.id === charId);
   const c = story.characters[idx];
-  const base = `/story/${story.id}`;
+
 
   if (!c)
     return (
@@ -31,6 +34,8 @@ export default function CharacterDetail() {
   const relsIn = story.relationships.filter((r) => r.to === c.id);
   const typeOf = (id: string) => story.relTypes.find((t) => t.id === id);
   const nameOf = (id: string) => story.characters.find((x) => x.id === id);
+  const isShared = story.sharedCharacterIds.includes(c.id);
+  const usedIn = story.kind === 'universe' ? storiesUsing(lib, c.id) : isShared ? storiesUsing(lib, c.id) : [];
 
   const addMissing = () => {
     const have = new Set(c.sections.map((s) => s.title.trim().toLowerCase()));
@@ -49,6 +54,23 @@ export default function CharacterDetail() {
         </span>
       </div>
 
+      {isShared && universe && (
+        <div className="shared-note">
+          🌌 Shared from <Link to={pathFor(universe)}>{universe.title || 'the universe'}</Link>. Changes here also show in{' '}
+          {usedIn.length > 1 ? `${usedIn.length - 1} other ${usedIn.length === 2 ? 'story' : 'stories'}` : 'the universe'}.
+        </div>
+      )}
+      {story.kind === 'universe' && (
+        <div className="shared-note">
+          🌌 Shared character.{' '}
+          {usedIn.length ? (
+            <>Appears in: {usedIn.map((s, i) => <span key={s.id}>{i > 0 && ', '}<Link to={pathFor(s)}>{s.title || 'Untitled'}</Link></span>)}</>
+          ) : (
+            'Not in any story yet: open a story in this universe and use "Add from universe".'
+          )}
+        </div>
+      )}
+
       <div className="char-hero card" style={{ borderColor: c.color }}>
         <div className="char-portrait" style={{ borderColor: c.color }}>
           {c.image ? <img src={c.image} alt="" onClick={() => setZoom(true)} /> : <Avatar c={c} size={140} />}
@@ -66,7 +88,7 @@ export default function CharacterDetail() {
           <div className="row gap wrap" style={{ marginTop: 8 }}>
             <span className="row gap small">Colour <ColorPick value={c.color} onChange={(v) => edit((ch) => void (ch.color = v))} /></span>
             <div className="menu-wrap">
-              <button className="btn small ghost" onClick={() => setMenu(!menu)}>Layout ▾</button>
+              <button className="btn small ghost" onClick={() => setMenu(!menu)}>More ▾</button>
               {menu && (
                 <div className="menu card" onMouseLeave={() => setMenu(false)}>
                   <button onClick={() => { addMissing(); setMenu(false); }}>Add missing layout sections</button>
@@ -79,7 +101,45 @@ export default function CharacterDetail() {
                   >
                     Use this layout for new characters
                   </button>
-                  <button
+                  {universe && !isShared && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Move ${c.name || 'this character'} into “${universe.title}” so other stories in the universe can use them too?`))
+                          update((d) => shareCharacter(d, story.id, c.id));
+                        setMenu(false);
+                      }}
+                    >
+                      🌌 Share with {universe.title || 'universe'}
+                    </button>
+                  )}
+                  {isShared && (
+                    <button
+                      onClick={() => {
+                        if (!confirm(`Remove ${c.name || 'this character'} from this story? They stay in the universe and in other stories.`)) return;
+                        upd((s) => {
+                          s.characters.splice(idx, 1);
+                          s.relationships = s.relationships.filter((r) => r.from !== c.id && r.to !== c.id);
+                        });
+                        nav(base + '/characters');
+                      }}
+                    >
+                      Remove from this story
+                    </button>
+                  )}
+                  {story.kind === 'universe' && (
+                    <button
+                      className="danger"
+                      onClick={() => {
+                        const n = usedIn.length;
+                        if (!confirm(`Delete ${c.name || 'this character'} everywhere?${n ? ` They'll disappear from ${n} ${n === 1 ? 'story' : 'stories'}.` : ''}`)) return;
+                        update((d) => deleteUniverseCharacter(d, story.id, c.id));
+                        nav(base + '/characters');
+                      }}
+                    >
+                      Delete character everywhere
+                    </button>
+                  )}
+                  {!isShared && story.kind !== 'universe' && <button
                     className="danger"
                     onClick={() => {
                       if (!confirm(`Delete ${c.name || 'this character'}? Their relationships will be deleted too.`)) return;
@@ -91,7 +151,7 @@ export default function CharacterDetail() {
                     }}
                   >
                     Delete character
-                  </button>
+                  </button>}
                 </div>
               )}
             </div>

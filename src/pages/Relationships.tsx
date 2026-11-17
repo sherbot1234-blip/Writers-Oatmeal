@@ -9,7 +9,7 @@ import type { Character, RelType, Relationship, Story } from '../types';
 type View = 'cards' | 'web' | 'types';
 
 export default function Relationships() {
-  const { story, upd } = useStoryCtx();
+  const { story, upd, base } = useStoryCtx();
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<View>('cards');
   const [editing, setEditing] = useState<{ from: string; to: string } | null>(null);
@@ -34,7 +34,7 @@ export default function Relationships() {
         <TypesEditor story={story} upd={upd} />
       ) : chars.length < 2 ? (
         <Empty icon="💞" title="Add at least two characters">
-          <Link className="btn" to={`/story/${story.id}/characters`}>Go to characters</Link>
+          <Link className="btn" to={`${base}/characters`}>Go to characters</Link>
         </Empty>
       ) : view === 'web' ? (
         <RelWeb

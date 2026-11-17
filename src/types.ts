@@ -122,8 +122,23 @@ export interface Question {
   answer: string;
 }
 
+export type StoryStatus = 'idea' | 'planning' | 'drafting' | 'editing' | 'finished' | 'on-hold';
+
+/**
+ * A story — or a universe. Universes use the same shape so they get the same
+ * pages (characters, world, songs…); their characters can be shared into any
+ * story that belongs to the universe.
+ */
 export interface Story {
   id: string;
+  kind: 'story' | 'universe';
+  status: StoryStatus;
+  /** The universe / series this story belongs to. */
+  universeId?: string;
+  /** Position within its universe (book 1, 2, 3…). */
+  seriesOrder: number;
+  /** Universe characters that appear in this story (edited in one place, shown everywhere). */
+  sharedCharacterIds: string[];
   title: string;
   tagline: string;
   synopsis: string;
@@ -149,6 +164,7 @@ export interface Library {
   version: 1;
   siteTitle: string;
   stories: Story[];
+  universes: Story[];
   /** When siteTitle (and future library settings) last changed — used by sync. */
   metaUpdatedAt: number;
   /** Deleted story id → when it was deleted, so deletions sync to other devices. */

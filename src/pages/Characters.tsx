@@ -6,6 +6,8 @@ import { SectionList } from '../components/Sections';
 import { cloneSectionShape, defaultCharacterTemplate } from '../defaults';
 import { move, SWATCHES, uid } from '../util';
 import type { Story } from '../types';
+import { useLibrary } from '../store';
+import { includeShared } from '../universe';
 
 export function newCharacterFor(story: Story) {
   return {
@@ -18,26 +20,40 @@ export function newCharacterFor(story: Story) {
 }
 
 export default function Characters() {
-  const { story, upd } = useStoryCtx();
+  const { story, upd, base, universe } = useStoryCtx();
+  const { update } = useLibrary();
   const nav = useNavigate();
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const sharedIds = new Set(story.sharedCharacterIds);
+  const available = universe ? universe.characters.filter((c) => !sharedIds.has(c.id)) : [];
 
   const add = () => {
     const c = newCharacterFor(story);
     upd((s) => void s.characters.push(c));
-    nav(`/story/${story.id}/characters/${c.id}`);
+    nav(`${base}/characters/${c.id}`);
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <h1>Characters</h1>
-        <div className="row gap">
+        <h1>{story.kind === 'universe' ? 'Shared cast' : 'Characters'}</h1>
+        <div className="row gap wrap">
           <button className="btn ghost" onClick={() => setTemplateOpen(true)}>Character card layout</button>
+          {universe && (
+            <button className="btn" onClick={() => setPicking(true)} disabled={!available.length} title={available.length ? '' : 'Every shared character is already in this story'}>
+              🌌 Add from {universe.title || 'universe'}
+            </button>
+          )}
           <button className="btn primary" onClick={add}>+ New character</button>
         </div>
       </div>
 
+      {story.kind === 'universe' && (
+        <p className="muted small">
+          Characters here can appear in any story in this universe. Edit them once and every story sees the change. In a story, use <b>🌌 Add from universe</b> to bring them in.
+        </p>
+      )}
       {story.characters.length === 0 ? (
         <Empty icon="👤" title="No characters yet">
           <p className="muted">
@@ -50,11 +66,12 @@ export default function Characters() {
             const facts = c.sections.find((s) => s.kind === 'facts')?.facts?.filter((f) => f.value).slice(0, 3) ?? [];
             return (
               <div key={c.id} className="char-card card" style={{ borderTopColor: c.color }}>
-                <Link to={`/story/${story.id}/characters/${c.id}`} className="char-card-link">
+                <Link to={`${base}/characters/${c.id}`} className="char-card-link">
                   <div className="char-card-img" style={{ background: c.image ? `url(${c.image}) center/cover` : c.color + '33' }}>
                     {!c.image && <Avatar c={c} size={72} />}
                   </div>
                   <div className="char-card-body">
+                    {sharedIds.has(c.id) && <span className="kind-badge shared-badge" title={`Shared from ${universe?.title}`}>🌌 shared</span>}
                     <h3>{c.name || 'Unnamed'}</h3>
                     {c.role && <p className="muted small">{c.role}</p>}
                     {facts.map((f) => (
@@ -73,6 +90,34 @@ export default function Characters() {
           })}
           <button className="char-card add card" onClick={add}>+ New character</button>
         </div>
+      )}
+
+      {picking && universe && (
+        <Modal title={`Add characters from ${universe.title || 'the universe'}`} onClose={() => setPicking(false)}>
+          <p className="muted small">They stay linked: edits made here or in any other story show up everywhere.</p>
+          <div className="pick-list">
+            {available.map((c) => (
+              <button
+                key={c.id}
+                className="pick-item"
+                onClick={() => {
+                  update((d) => includeShared(d, story.id, [c.id]));
+                  if (available.length === 1) setPicking(false);
+                }}
+              >
+                <Avatar c={c} size={36} />
+                <span>
+                  <b>{c.name || 'Unnamed'}</b>
+                  {c.role && <span className="muted small"> · {c.role}</span>}
+                </span>
+                <span className="muted">+ Add</span>
+              </button>
+            ))}
+          </div>
+          <div className="row end" style={{ marginTop: 12 }}>
+            <button className="btn primary" onClick={() => setPicking(false)}>Done</button>
+          </div>
+        </Modal>
       )}
 
       {templateOpen && (

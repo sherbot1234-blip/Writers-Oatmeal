@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { produce, type Draft } from 'immer';
 import { get, set } from 'idb-keyval';
 import type { Library, Story } from './types';
 import { emptyLibrary, normalizeLibrary } from './defaults';
+import { docId } from './sync/engine';
 
 const KEY = 'writers-oatmeal-library';
 
@@ -20,15 +21,31 @@ interface Ctx {
 
 const LibraryContext = createContext<Ctx | null>(null);
 
-/** Records deletions and settings changes so they can sync to other devices. */
+/**
+ * Runs after every local edit: stamps updatedAt on whatever story/universe
+ * actually changed, and records deletions so they sync to other devices.
+ */
 function stamp(prev: Library, next: Library): Library {
-  const ids = new Set(next.stories.map((s) => s.id));
-  const removed = prev.stories.filter((s) => !ids.has(s.id));
-  const titleChanged = prev.siteTitle !== next.siteTitle;
-  if (!removed.length && !titleChanged) return next;
   const now = Date.now();
+  const touched: [('stories' | 'universes'), string][] = [];
+  const removed: string[] = [];
+  for (const [key, kind] of [['stories', 'story'], ['universes', 'universe']] as const) {
+    const before = new Map(prev[key].map((x) => [x.id, x]));
+    const ids = new Set(next[key].map((x) => x.id));
+    for (const x of next[key]) {
+      const old = before.get(x.id);
+      if (old && old !== x && old.updatedAt === x.updatedAt) touched.push([key, x.id]);
+    }
+    for (const x of prev[key]) if (!ids.has(x.id)) removed.push(docId(kind, x.id));
+  }
+  const titleChanged = prev.siteTitle !== next.siteTitle;
+  if (!touched.length && !removed.length && !titleChanged) return next;
   return produce(next, (d) => {
-    removed.forEach((s) => (d.tombstones[s.id] = now));
+    for (const [key, id] of touched) {
+      const x = d[key].find((y) => y.id === id);
+      if (x) x.updatedAt = Math.max(now, x.updatedAt + 1);
+    }
+    removed.forEach((id) => (d.tombstones[id] = now));
     if (titleChanged) d.metaUpdatedAt = now;
   });
 }
@@ -86,19 +103,53 @@ export function useLibrary() {
   return ctx;
 }
 
-export function useStory(id: string | undefined): [Story | undefined, StoryUpdater] {
+/** Finds a story or universe by id. */
+export const findAny = (lib: Library | Draft<Library>, id: string | undefined) =>
+  lib.stories.find((s) => s.id === id) ?? lib.universes.find((u) => u.id === id);
+
+/**
+ * A story (or universe) plus an updater. For a story in a universe, `characters`
+ * includes the universe characters shared into it; edits to those land on the
+ * universe, so they show up in every story that uses them. Removing a shared
+ * character from the list only removes it from this story.
+ */
+export function useStory(id: string | undefined): [Story | undefined, StoryUpdater, Story | undefined] {
   const { lib, update } = useLibrary();
-  const story = lib.stories.find((s) => s.id === id);
+  const own = findAny(lib, id) as Story | undefined;
+  const universe = own?.kind === 'story' && own.universeId ? lib.universes.find((u) => u.id === own.universeId) : undefined;
+
+  const view = useMemo(() => {
+    if (!own || !universe || !own.sharedCharacterIds.length) return own;
+    const shared = own.sharedCharacterIds.map((cid) => universe.characters.find((c) => c.id === cid)).filter((c) => !!c);
+    return { ...own, characters: [...own.characters, ...shared] };
+  }, [own, universe]);
+
   const upd: StoryUpdater = useCallback(
     (fn) =>
       update((d) => {
-        const s = d.stories.find((x) => x.id === id);
-        if (s) {
-          fn(s);
-          s.updatedAt = Date.now();
-        }
+        const s = findAny(d, id);
+        if (!s) return;
+        const u = s.kind === 'story' && s.universeId ? d.universes.find((x) => x.id === s.universeId) : undefined;
+        if (!u || !s.sharedCharacterIds.length) return fn(s);
+
+        const sharedIds = new Set(s.sharedCharacterIds);
+        const ownBefore = [...s.characters];
+        let merged = [...s.characters, ...s.sharedCharacterIds.map((cid) => u.characters.find((c) => c.id === cid)).filter((c) => !!c)];
+        const view = new Proxy(s, {
+          get: (t, k) => (k === 'characters' ? merged : (t as any)[k]),
+          set: (t, k, v) => {
+            if (k === 'characters') merged = v;
+            else (t as any)[k] = v;
+            return true;
+          },
+        });
+        fn(view);
+        const ownAfter = merged.filter((c) => !sharedIds.has(c.id));
+        const sharedAfter = merged.filter((c) => sharedIds.has(c.id)).map((c) => c.id);
+        if (ownAfter.length !== ownBefore.length || ownAfter.some((c, i) => c !== ownBefore[i])) s.characters = ownAfter;
+        if (sharedAfter.join() !== s.sharedCharacterIds.join()) s.sharedCharacterIds = sharedAfter;
       }),
     [id, update],
   );
-  return [story, upd];
+  return [view, upd, universe];
 }

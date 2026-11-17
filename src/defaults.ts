@@ -1,4 +1,4 @@
-import type { Arc, Library, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
+import type { Arc, Library, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
 export const THEME_PRESETS: { name: string; theme: Theme }[] = [
@@ -161,10 +161,33 @@ export function defaultArcs(): Arc[] {
   ];
 }
 
+export const STATUSES: { key: StoryStatus; label: string; icon: string; color: string }[] = [
+  { key: 'idea', label: 'Idea', icon: '💡', color: '#e9c46a' },
+  { key: 'planning', label: 'Planning', icon: '🗺️', color: '#7aa6d8' },
+  { key: 'drafting', label: 'Drafting', icon: '✍️', color: '#e76f51' },
+  { key: 'editing', label: 'Editing', icon: '🔍', color: '#9b5de5' },
+  { key: 'finished', label: 'Finished', icon: '🏁', color: '#2a9d8f' },
+  { key: 'on-hold', label: 'On hold', icon: '⏸️', color: '#94a3b8' },
+];
+export const statusInfo = (s: StoryStatus) => STATUSES.find((x) => x.key === s) ?? STATUSES[1];
+
+export function makeUniverse(name = 'New Universe', theme?: Theme): Story {
+  const u = makeStory(name, theme);
+  u.kind = 'universe';
+  u.tabs = u.tabs.map((t) => ({ ...t, hidden: t.key === 'plot', label: t.key === 'characters' ? 'Shared cast' : t.label }));
+  u.arcs = [];
+  u.questions = [];
+  return u;
+}
+
 export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
   const now = Date.now();
   return {
     id: uid(),
+    kind: 'story',
+    status: 'planning',
+    seriesOrder: 0,
+    sharedCharacterIds: [],
     title,
     tagline: '',
     synopsis: '',
@@ -196,7 +219,10 @@ export function normalizeStory(raw: Partial<Story>): Story {
     ...tabs.filter((t) => DEFAULT_TABS.some((d) => d.key === t.key)),
     ...DEFAULT_TABS.filter((d) => !tabs.some((t) => t.key === d.key)).map((t) => ({ ...t })),
   ];
-  for (const k of ['genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  if (s.kind !== 'universe') s.kind = 'story';
+  if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
+  if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
+  for (const k of ['sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
@@ -204,7 +230,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
 }
 
 export function emptyLibrary(): Library {
-  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], metaUpdatedAt: 0, tombstones: {} };
+  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], metaUpdatedAt: 0, tombstones: {} };
 }
 
 export function normalizeLibrary(raw: unknown): Library | null {
@@ -215,6 +241,7 @@ export function normalizeLibrary(raw: unknown): Library | null {
     version: 1,
     siteTitle: r.siteTitle || "Writer's Oatmeal",
     stories: r.stories.map(normalizeStory),
+    universes: Array.isArray(r.universes) ? r.universes.map((u) => ({ ...normalizeStory(u), kind: 'universe' as const })) : [],
     metaUpdatedAt: typeof r.metaUpdatedAt === 'number' ? r.metaUpdatedAt : 0,
     tombstones: r.tombstones && typeof r.tombstones === 'object' ? r.tombstones : {},
   };

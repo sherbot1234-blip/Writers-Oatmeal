@@ -4,7 +4,7 @@ import { useLibrary, useStory } from '../store';
 import { ensureFonts } from '../util';
 import { SaveBadge, themeVars } from './Library';
 import type { TabKey } from '../types';
-import type { StoryCtx } from '../storyContext';
+import { pathFor, type StoryCtx } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
 
 const TAB_ICONS: Record<TabKey, string> = {
@@ -18,7 +18,7 @@ const TAB_ICONS: Record<TabKey, string> = {
 
 export default function StoryLayout() {
   const { storyId } = useParams();
-  const [story, upd] = useStory(storyId);
+  const [story, upd, universe] = useStory(storyId);
   const { saveState } = useLibrary();
 
   useEffect(() => {
@@ -37,7 +37,8 @@ export default function StoryLayout() {
     );
 
   const t = story.theme;
-  const ctx: StoryCtx = { story, upd };
+  const base = pathFor(story);
+  const ctx: StoryCtx = { story, upd, universe, base };
   return (
     <div className="story-root" style={{ ...themeVars(t), background: t.bg, color: t.text }}>
       {t.bgImage && (
@@ -47,7 +48,13 @@ export default function StoryLayout() {
       )}
       <header className="story-head">
         <Link to="/" className="back" title="All stories">← Library</Link>
-        <Link to={`/story/${story.id}`} className="story-name">{story.title || 'Untitled'}</Link>
+        {universe && (
+          <Link to={pathFor(universe)} className="crumb-universe" title="Universe">🌌 {universe.title || 'Universe'} ›</Link>
+        )}
+        <Link to={base} className="story-name">
+          {story.kind === 'universe' && <span title="Universe">🌌 </span>}
+          {story.title || 'Untitled'}
+        </Link>
         <span className="muted small save"><SaveBadge state={saveState} /></span>
         <CloudButton />
       </header>
@@ -55,11 +62,11 @@ export default function StoryLayout() {
         {story.tabs
           .filter((tab) => !tab.hidden)
           .map((tab) => (
-            <NavLink key={tab.key} to={tab.key === 'overview' ? `/story/${story.id}` : `/story/${story.id}/${tab.key}`} end={tab.key === 'overview'} className="tab">
+            <NavLink key={tab.key} to={tab.key === 'overview' ? base : `${base}/${tab.key}`} end={tab.key === 'overview'} className="tab">
               <span aria-hidden>{TAB_ICONS[tab.key]}</span> {tab.label}
             </NavLink>
           ))}
-        <NavLink to={`/story/${story.id}/settings`} className="tab tab-settings">
+        <NavLink to={`${base}/settings`} className="tab tab-settings">
           🎨 <span className="tab-settings-label">Customise</span>
         </NavLink>
       </nav>
