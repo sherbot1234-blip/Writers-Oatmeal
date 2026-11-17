@@ -27,6 +27,10 @@ export interface Song {
   url: string;
   note: string;
   characterIds: string[];
+  /** chapters this song belongs to (soundtrack for writing / scenes) */
+  chapterIds: string[];
+  /** plot points / scenes this song is for */
+  pointIds: string[];
 }
 
 export type SectionKind = 'facts' | 'text' | 'stats' | 'tags' | 'images' | 'quotes';

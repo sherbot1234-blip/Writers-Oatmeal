@@ -277,6 +277,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (!s.characterArcs || typeof s.characterArcs !== 'object') s.characterArcs = {};
   s.relTypes = s.relTypes.map((t) => (t.family || !inferFamily(t.label) ? t : { ...t, family: inferFamily(t.label) }));
   // older relationships had a single type and feeling: move them to the first moment
+  s.songs = s.songs.map((x) => ({ ...x, characterIds: x.characterIds ?? [], chapterIds: x.chapterIds ?? [], pointIds: x.pointIds ?? [] }));
   s.relationships = s.relationships.map((r: any) => {
     if (r.states && typeof r.states === 'object') return r;
     const { typeId, feeling, ...rest } = r;

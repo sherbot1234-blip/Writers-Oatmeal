@@ -17,6 +17,8 @@ interface Ctx {
   /** For sync: replaces the library without recording deletions as local edits. */
   applyRemote: (fn: (l: Library) => Library) => void;
   saveState: 'saved' | 'saving' | 'error';
+  /** Writes everything to storage right now (e.g. before leaving the site). */
+  saveNow: () => Promise<void>;
 }
 
 const LibraryContext = createContext<Ctx | null>(null);
@@ -66,11 +68,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     navigator.storage?.persist?.().catch(() => {});
   }, []);
 
-  const flush = useCallback(() => {
+  const flush = useCallback(async () => {
     if (!latest.current) return;
-    set(KEY, latest.current)
-      .then(() => setSaveState('saved'))
-      .catch(() => setSaveState('error'));
+    clearTimeout(timer.current);
+    try {
+      await set(KEY, latest.current);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
   }, []);
 
   useEffect(() => {
@@ -88,7 +94,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onHide = () => document.visibilityState === 'hidden' && flush();
     document.addEventListener('visibilitychange', onHide);
-    return () => document.removeEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flush);
+    };
   }, [flush]);
 
   const update = useCallback((fn: LibUpdater) => setLib((prev) => (prev ? stamp(prev, produce(prev, fn)) : prev)), []);
@@ -96,7 +106,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const applyRemote = useCallback((fn: (l: Library) => Library) => setLib((prev) => (prev ? fn(prev) : prev)), []);
 
   if (!lib) return <div className="loading">Loading your stories…</div>;
-  return <LibraryContext.Provider value={{ lib, update, replace, applyRemote, saveState }}>{children}</LibraryContext.Provider>;
+  return <LibraryContext.Provider value={{ lib, update, replace, applyRemote, saveState, saveNow: flush }}>{children}</LibraryContext.Provider>;
 }
 
 export function useLibrary() {

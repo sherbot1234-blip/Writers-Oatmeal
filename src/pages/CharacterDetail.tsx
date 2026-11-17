@@ -6,6 +6,7 @@ import { deleteUniverseCharacter, shareCharacter, storiesUsing } from '../univer
 import { Avatar, ColorPick, Field, ImagePick, Lightbox } from '../components/ui';
 import { SectionList } from '../components/Sections';
 import { Links } from '../components/Links';
+import { AddSong, MiniSongs } from '../components/Music';
 import { cloneSectionShape } from '../defaults';
 import { stateAt, typesOf } from '../relations';
 import { uid } from '../util';
@@ -47,6 +48,7 @@ export default function CharacterDetail() {
   const shownImage = era?.image ?? c.image;
   const arc: CharArc = story.characterArcs[c.id] ?? { start: '', change: '', end: '' };
   const setArc = (k: keyof CharArc, v: string) => upd((s) => void (s.characterArcs[c.id] = { ...(s.characterArcs[c.id] ?? { start: '', change: '', end: '' }), [k]: v }));
+  const themeSongs = story.songs.filter((s) => s.characterIds.includes(c.id));
   const appearances = story.arcs.flatMap((a) => a.points.filter((p) => p.characterIds.includes(c.id)).map((p) => ({ arc: a, p })));
 
   const addMissing = () => {
@@ -228,6 +230,25 @@ export default function CharacterDetail() {
       </section>
 
       <SectionList accent={c.color} sections={c.sections} edit={(fn) => edit((ch) => fn(ch.sections))} />
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2 className="sec-title">🎵 Theme songs</h2>
+        {themeSongs.length > 0 ? (
+          <MiniSongs
+            songs={themeSongs}
+            unlinkLabel="Not their theme"
+            onUnlink={(id) => upd((s) => { const x = s.songs.find((y) => y.id === id); if (x) x.characterIds = x.characterIds.filter((y) => y !== c.id); })}
+          />
+        ) : (
+          <p className="muted small">Songs that sound like {c.name || 'this character'}. They also appear on the Songs page.</p>
+        )}
+        <AddSong
+          songs={story.songs.filter((s) => !s.characterIds.includes(c.id))}
+          onPick={(id) => upd((s) => void s.songs.find((x) => x.id === id)!.characterIds.push(c.id))}
+          onCreate={(song) => upd((s) => void s.songs.push({ ...song, characterIds: [c.id] }))}
+          label="+ Add a theme song"
+        />
+      </section>
 
       {story.kind === 'story' && (
         <section className="card char-arc" style={{ marginTop: 16, ['--cc' as any]: c.color }}>

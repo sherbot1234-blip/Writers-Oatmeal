@@ -22,7 +22,10 @@ const editorPage = (
 );
 import Settings from './pages/Settings';
 import './styles.css';
+import { completeLoginIfReturning } from './spotify';
 
+// finish a Spotify sign-in first if we've just come back from it, then start the app
+completeLoginIfReturning().finally(() =>
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <LibraryProvider>
@@ -60,4 +63,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </CloudProvider>
     </LibraryProvider>
   </React.StrictMode>,
+  ),
 );

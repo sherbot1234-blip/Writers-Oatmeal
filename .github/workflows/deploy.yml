@@ -29,6 +29,7 @@ jobs:
           # Optional: set these under Settings → Secrets and variables → Actions → Variables
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           VITE_SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+          VITE_SPOTIFY_CLIENT_ID: ${{ vars.SPOTIFY_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

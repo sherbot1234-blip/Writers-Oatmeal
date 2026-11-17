@@ -7,9 +7,10 @@ import { CHAPTER_STATUSES } from '../defaults';
 import { removeCommentMark, RichEditor, scrollToComment } from '../components/Editor';
 import { Avatar, Field, Lightbox } from '../components/ui';
 import { uid } from '../util';
+import { AddSong, MiniSongs, Player } from '../components/Music';
 import type { Chapter, ChapterStatus, Character, Story } from '../types';
 
-type Panel = 'notes' | 'cast' | 'plot' | 'world';
+type Panel = 'notes' | 'cast' | 'plot' | 'world' | 'music';
 
 export default function ChapterEditor() {
   const { story, upd, base } = useStoryCtx();
@@ -123,6 +124,7 @@ export default function ChapterEditor() {
                   ['cast', '👤', 'Cast'],
                   ['plot', '🧵', 'Plot'],
                   ['world', '🗺️', 'World'],
+                  ['music', '🎵', 'Music'],
                 ] as const
               ).map(([k, icon, label]) => (
                 <button key={k} className={panel === k ? 'on' : ''} onClick={() => setPanel(k)}>
@@ -152,6 +154,7 @@ export default function ChapterEditor() {
               {panel === 'cast' && <CastPanel story={story} povId={ch.povId} />}
               {panel === 'plot' && <PlotPanel story={story} chapterId={ch.id} upd={upd} base={base} />}
               {panel === 'world' && <WorldPanel story={story} />}
+              {panel === 'music' && <MusicPanel story={story} chapterId={ch.id} upd={upd} povId={ch.povId} />}
             </div>
           </aside>
         )}
@@ -354,6 +357,45 @@ function WorldPanel({ story }: { story: Story }) {
       ))}
       {!answered.length && <p className="muted small">Answers from the World page show up here.</p>}
       {zoom !== null && <Lightbox src={story.worldImages[zoom].src} caption={story.worldImages[zoom].title} onClose={() => setZoom(null)} />}
+    </>
+  );
+}
+
+/** The chapter's soundtrack: songs linked to it, to its scenes, and the POV character's themes. */
+function MusicPanel({ story, chapterId, upd, povId }: { story: Story; chapterId: string; upd: ReturnType<typeof useStoryCtx>['upd']; povId?: string }) {
+  const scenes = new Set(story.arcs.flatMap((a) => a.points.filter((p) => p.chapterId === chapterId).map((p) => p.id)));
+  const here = story.songs.filter((s) => s.chapterIds.includes(chapterId) || s.pointIds.some((p) => scenes.has(p)));
+  const pov = story.characters.find((c) => c.id === povId);
+  const povSongs = pov ? story.songs.filter((s) => s.characterIds.includes(pov.id) && !here.includes(s)) : [];
+  return (
+    <>
+      <p className="muted small" style={{ marginTop: 0 }}>Songs for this chapter. Press ▶ to listen while you write.</p>
+      {here.length ? (
+        <MiniSongs
+          songs={here}
+          unlinkLabel="Remove from this chapter"
+          onUnlink={(id) => upd((s) => { const x = s.songs.find((y) => y.id === id); if (x) x.chapterIds = x.chapterIds.filter((y) => y !== chapterId); })}
+        />
+      ) : (
+        <p className="muted small">No songs linked yet.</p>
+      )}
+      <AddSong
+        songs={story.songs.filter((s) => !here.includes(s))}
+        onPick={(id) => upd((s) => void s.songs.find((x) => x.id === id)!.chapterIds.push(chapterId))}
+        onCreate={(song) => upd((s) => void s.songs.push({ ...song, chapterIds: [chapterId] }))}
+      />
+      {povSongs.length > 0 && (
+        <>
+          <label className="lbl">{pov!.name}&rsquo;s theme songs</label>
+          <MiniSongs songs={povSongs} />
+        </>
+      )}
+      {story.playlistUrl && (
+        <>
+          <label className="lbl">Story playlist</label>
+          <Player url={story.playlistUrl} />
+        </>
+      )}
     </>
   );
 }
