@@ -7,6 +7,7 @@ import { CHAPTER_STATUSES } from '../defaults';
 import { removeCommentMark, RichEditor, scrollToComment } from '../components/Editor';
 import { Avatar, Field, Lightbox } from '../components/ui';
 import { uid } from '../util';
+import { groupCharacters } from '../categories';
 import { AddSong, MiniSongs, Player } from '../components/Music';
 import type { Chapter, ChapterStatus, Character, Story } from '../types';
 
@@ -85,9 +86,17 @@ export default function ChapterEditor() {
           </select>
           <select className="input slim" value={ch.povId ?? ''} onChange={(e) => set((c) => void (c.povId = e.target.value || undefined))} aria-label="Point of view">
             <option value="">POV: —</option>
-            {story.characters.map((c) => (
-              <option key={c.id} value={c.id}>POV: {c.name || 'Unnamed'}</option>
-            ))}
+            {story.charCategories.length
+              ? groupCharacters(story, story.characters).map((g, gi) => (
+                  <optgroup key={g.cat?.id ?? 'none' + gi} label={g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Others'}>
+                    {g.chars.map((c) => (
+                      <option key={g.cat?.id + c.id} value={c.id}>POV: {c.name || 'Unnamed'}</option>
+                    ))}
+                  </optgroup>
+                ))
+              : story.characters.map((c) => (
+                  <option key={c.id} value={c.id}>POV: {c.name || 'Unnamed'}</option>
+                ))}
           </select>
           <span className="muted small">{ch.words.toLocaleString()} words</span>
           <button className="btn small" onClick={startComment} title="Select text, then click to leave a note on it">💬 Note</button>
@@ -235,14 +244,17 @@ function NotesPanel({
 function CastPanel({ story, povId }: { story: Story; povId?: string }) {
   const [open, setOpen] = useState<string | null>(povId ?? null);
   const [q, setQ] = useState('');
-  const list = [...story.characters]
-    .sort((a, b) => (a.id === povId ? -1 : b.id === povId ? 1 : 0))
-    .filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()));
+  const pov = story.characters.find((c) => c.id === povId);
+  const rest = story.characters.filter((c) => c.id !== povId && (!q || c.name.toLowerCase().includes(q.toLowerCase())));
+  const groups = [...(pov && (!q || pov.name.toLowerCase().includes(q.toLowerCase())) ? [{ label: 'Point of view', chars: [pov] }] : []), ...groupCharacters(story, rest).map((g) => ({ label: story.charCategories.length ? (g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Others') : '', chars: g.chars }))];
   return (
     <>
       {story.characters.length > 6 && <input className="input slim" style={{ width: '100%', marginBottom: 8 }} placeholder="Find a character…" value={q} onChange={(e) => setQ(e.target.value)} />}
       {!story.characters.length && <p className="muted small">No characters yet.</p>}
-      {list.map((c) => (
+      {groups.map((g, gi) => (
+        <div key={gi}>
+          {g.label && <div className="cast-panel-group small muted">{g.label}</div>}
+          {g.chars.map((c) => (
         <div key={c.id} className="cast-item">
           <button className="cast-head" onClick={() => setOpen(open === c.id ? null : c.id)}>
             <Avatar c={c} size={32} />
@@ -252,6 +264,8 @@ function CastPanel({ story, povId }: { story: Story; povId?: string }) {
             </span>
           </button>
           {open === c.id && <CastDetail c={c} />}
+        </div>
+          ))}
         </div>
       ))}
     </>

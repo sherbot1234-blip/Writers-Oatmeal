@@ -15,7 +15,7 @@ export function linkKind(url: string): { icon: string; name: string } {
 const normalise = (url: string) => (/^[a-z]+:\/\//i.test(url) ? url : 'https://' + url);
 
 /** A small list of outside links, e.g. the Milanote boards for a story or character. */
-export function Links({ links, onChange, hint = 'Paste a Milanote board link (Share → Copy link), or any other link' }: { links: LinkItem[]; onChange: (l: LinkItem[]) => void; hint?: string }) {
+export function Links({ links, onChange, hint = 'Paste a Milanote board link (Share → Copy link), or any other link', addLabel = '+ Link a board' }: { links: LinkItem[]; onChange: (l: LinkItem[]) => void; hint?: string; addLabel?: string }) {
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
   const [adding, setAdding] = useState(false);
@@ -48,7 +48,7 @@ export function Links({ links, onChange, hint = 'Paste a Milanote board link (Sh
           <span className="muted small" style={{ flexBasis: '100%' }}>{hint}</span>
         </div>
       ) : (
-        <button className="btn small dashed" onClick={() => setAdding(true)}>+ Link a board</button>
+        <button className="btn small dashed" onClick={() => setAdding(true)}>{addLabel}</button>
       )}
     </div>
   );

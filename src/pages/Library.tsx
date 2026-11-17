@@ -265,7 +265,14 @@ export default function LibraryPage() {
                 )}
               </div>
               <div className={'books ' + view}>
-                {sh.books.map((s) => (view === 'spines' ? <Spine key={s.id} s={s} seriesNo={sh.universe && sort === 'series' ? s.seriesOrder : undefined} /> : <Cover key={s.id} s={s} />))}
+                {sh.books.map((s) => (
+                  <span key={s.id} className="book-wrap">
+                    {view === 'spines' ? <Spine s={s} seriesNo={sh.universe && sort === 'series' ? s.seriesOrder : undefined} /> : <Cover s={s} />}
+                    {s.milanoteUrl && (
+                      <a className="book-board" href={s.milanoteUrl} target="_blank" rel="noreferrer" title="Open Milanote board" aria-label={`Milanote board for ${s.title}`}>📌</a>
+                    )}
+                  </span>
+                ))}
                 {!sh.books.length && <span className="muted small shelf-empty">No stories on this shelf yet: open a story and choose this universe.</span>}
               </div>
               <div className="plank" aria-hidden />

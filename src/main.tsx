@@ -13,6 +13,7 @@ import Relationships from './pages/Relationships';
 import Plot from './pages/Plot';
 import World from './pages/World';
 import Chapters from './pages/Chapters';
+import FamilyTrees from './pages/FamilyTrees';
 import CustomPageView from './pages/CustomPageView';
 // the editor is big, so it only loads when you open a chapter
 const ChapterEditor = lazy(() => import('./pages/ChapterEditor'));
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="characters" element={<Characters />} />
             <Route path="characters/:charId" element={<CharacterDetail />} />
             <Route path="relationships" element={<Relationships />} />
+            <Route path="trees" element={<FamilyTrees />} />
             <Route path="plot" element={<Plot />} />
             <Route path="world" element={<World />} />
             <Route path="chapters" element={<Chapters />} />
@@ -53,6 +55,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="characters" element={<Characters />} />
             <Route path="characters/:charId" element={<CharacterDetail />} />
             <Route path="relationships" element={<Relationships />} />
+            <Route path="trees" element={<FamilyTrees />} />
             <Route path="plot" element={<Plot />} />
             <Route path="world" element={<World />} />
             <Route path="chapters" element={<Chapters />} />

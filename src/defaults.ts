@@ -1,4 +1,4 @@
-import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
+import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, TreeLineType, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
 export const THEME_BASE = { card: 'soft', texture: 'none', ornament: '', headingCase: 'normal', mood: 'main', mainName: 'Light', altName: 'Dark' } as const;
@@ -23,6 +23,7 @@ export const DEFAULT_TABS: TabConfig[] = [
   { key: 'overview', label: 'Overview', hidden: false },
   { key: 'characters', label: 'Characters', hidden: false },
   { key: 'relationships', label: 'Relationships', hidden: false },
+  { key: 'trees', label: 'Family trees', hidden: false },
   { key: 'plot', label: 'Plot', hidden: false },
   { key: 'chapters', label: 'Chapters', hidden: false },
   { key: 'world', label: 'World', hidden: false },
@@ -244,6 +245,11 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     characterTemplate: defaultCharacterTemplate(),
     relTypes: defaultRelTypes(),
     relationships: [],
+    charCategories: [],
+    charCategoryMap: {},
+    trees: [],
+    treeLineTypes: defaultLineTypes(),
+    milanoteUrl: '',
     moments: defaultMoments(),
     relMeters: defaultMeters(),
     characterArcs: {},
@@ -275,7 +281,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (s.kind !== 'universe') s.kind = 'story';
   if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
   if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
-  for (const k of ['customPages', 'lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  for (const k of ['charCategories', 'trees', 'treeLineTypes', 'customPages', 'lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
@@ -286,6 +292,14 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (!Array.isArray(s.moments) || !s.moments.length) s.moments = defaultMoments();
   if (!Array.isArray(s.relMeters)) s.relMeters = defaultMeters();
   if (!s.characterArcs || typeof s.characterArcs !== 'object') s.characterArcs = {};
+  if (!s.charCategoryMap || typeof s.charCategoryMap !== 'object') s.charCategoryMap = {};
+  if (!s.treeLineTypes.length) s.treeLineTypes = defaultLineTypes();
+  if (typeof raw.milanoteUrl !== 'string') {
+    // pull a Milanote board out of the old links list into its own field
+    const m = s.links.find((l) => /milanote\.com/i.test(l.url));
+    s.milanoteUrl = m?.url ?? '';
+    if (m) s.links = s.links.filter((l) => l.id !== m.id);
+  }
   s.relTypes = s.relTypes.map((t) => (t.family || !inferFamily(t.label) ? t : { ...t, family: inferFamily(t.label) }));
   // older relationships had a single type and feeling: move them to the first moment
   s.songs = s.songs.map((x) => ({ ...x, characterIds: x.characterIds ?? [], chapterIds: x.chapterIds ?? [], pointIds: x.pointIds ?? [] }));
@@ -294,8 +308,34 @@ export function normalizeStory(raw: Partial<Story>): Story {
     const { typeId, feeling, ...rest } = r;
     return { ...rest, notes: r.notes ?? '', states: { [s.moments[0].id]: { typeIds: typeId ? [typeId] : [], feeling: feeling ?? '', values: {} } } };
   });
+  s.relationships = mergeMutual(s.relationships);
   return s;
 }
+
+/** Two one-way relationships that say exactly the same thing become one mutual relationship. */
+function mergeMutual(rels: Story['relationships']) {
+  const key = (st: Record<string, { typeIds: string[]; feeling: string; values: Record<string, number> }>) =>
+    JSON.stringify(Object.keys(st).sort().map((k) => [k, [...st[k].typeIds].sort(), st[k].feeling, Object.entries(st[k].values).sort()]));
+  const drop = new Set<string>();
+  const out = rels.map((r) => {
+    if (r.mutual !== undefined || drop.has(r.id)) return r;
+    const back = rels.find((x) => x.from === r.to && x.to === r.from && x.mutual === undefined && !drop.has(x.id));
+    if (!back) return { ...r, mutual: false };
+    if (key(r.states) !== key(back.states) || (back.notes && back.notes !== r.notes)) return { ...r, mutual: false };
+    drop.add(back.id);
+    return { ...r, mutual: true };
+  });
+  return out.filter((r) => !drop.has(r.id)).map((r) => (r.mutual === undefined ? { ...r, mutual: false } : r));
+}
+
+export const defaultLineTypes = (): TreeLineType[] => [
+  { id: uid(), label: 'Parent → child', color: '#6b5b4b', style: 'solid', shape: 'down' },
+  { id: uid(), label: 'Partners', color: '#d0567a', style: 'double', shape: 'straight' },
+  { id: uid(), label: 'Adopted', color: '#6b5b4b', style: 'dashed', shape: 'down' },
+  { id: uid(), label: 'Siblings', color: '#ddb34c', style: 'dotted', shape: 'straight' },
+  { id: uid(), label: 'Blood bond', color: '#b3261e', style: 'dotted', shape: 'straight' },
+  { id: uid(), label: 'Secretly related', color: '#7b2cbf', style: 'dashed', shape: 'straight' },
+];
 
 export function emptyLibrary(): Library {
   return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], chapters: [], metaUpdatedAt: 0, tombstones: {} };

@@ -8,7 +8,7 @@ import { SectionList } from '../components/Sections';
 import { Links } from '../components/Links';
 import { AddSong, MiniSongs } from '../components/Music';
 import { cloneSectionShape } from '../defaults';
-import { stateAt, typesOf } from '../relations';
+import { partnersOf, relFor, stateAt, typesOf } from '../relations';
 import { uid } from '../util';
 import type { CharArc } from '../types';
 
@@ -35,8 +35,7 @@ export default function CharacterDetail() {
   const edit = (fn: (ch: typeof c) => void) => upd((s) => fn(s.characters[idx]));
   const prev = story.characters[idx - 1];
   const next = story.characters[idx + 1];
-  const relsOut = story.relationships.filter((r) => r.from === c.id);
-  const relsIn = story.relationships.filter((r) => r.to === c.id);
+  const partners = partnersOf(story, c.id);
   const last = story.moments.length - 1;
   const latest = (r: (typeof story.relationships)[number] | undefined) => typesOf(story, stateAt(r, story.moments, last)?.state);
   const nameOf = (id: string) => story.characters.find((x) => x.id === id);
@@ -107,7 +106,37 @@ export default function CharacterDetail() {
             </div>
           )}
           {era?.description && <p className="era-desc small">{era.description}</p>}
-          <Links links={c.links ?? []} onChange={(l) => edit((ch) => void (ch.links = l))} />
+          {story.charCategories.length > 0 && (
+            <div className="chip-row cat-chips">
+              {story.charCategories.map((k) => {
+                const on = (story.charCategoryMap[c.id] ?? []).includes(k.id);
+                return (
+                  <button
+                    key={k.id}
+                    className={'chip' + (on ? ' on' : '')}
+                    style={on ? { borderColor: k.color, background: k.color + '33' } : undefined}
+                    onClick={() =>
+                      upd((s) => {
+                        const cur = s.charCategoryMap[c.id] ?? [];
+                        s.charCategoryMap[c.id] = on ? cur.filter((x) => x !== k.id) : [...cur, k.id];
+                      })
+                    }
+                    title={on ? `Remove from ${k.name}` : `Add to ${k.name}`}
+                  >
+                    {k.icon} {k.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="row gap wrap">
+            {(story.milanoteUrl || universe?.milanoteUrl) && (
+              <a className="link-chip milanote-chip" href={story.milanoteUrl || universe!.milanoteUrl} target="_blank" rel="noreferrer">
+                <span>📌 Story board</span>
+              </a>
+            )}
+            <Links links={c.links ?? []} onChange={(l) => edit((ch) => void (ch.links = l))} />
+          </div>
           <div className="row gap wrap" style={{ marginTop: 8 }}>
             <span className="row gap small">Colour <ColorPick value={c.color} onChange={(v) => edit((ch) => void (ch.color = v))} /></span>
             <div className="menu-wrap">
@@ -291,15 +320,15 @@ export default function CharacterDetail() {
           <h2 className="sec-title">Relationships {story.moments.length > 1 && <span className="muted small">(by “{story.moments[last].label}”)</span>}</h2>
           <Link className="btn small" to={`${base}/relationships?focus=${c.id}`}>Open in relationships →</Link>
         </div>
-        {relsOut.length + relsIn.length === 0 ? (
+        {partners.length === 0 ? (
           <p className="muted small">None yet.</p>
         ) : (
           <div className="rel-mini">
             {story.characters
-              .filter((o) => o.id !== c.id && (relsOut.some((r) => r.to === o.id) || relsIn.some((r) => r.from === o.id)))
+              .filter((o) => partners.includes(o.id))
               .map((o) => {
-                const out = relsOut.find((r) => r.to === o.id);
-                const inn = relsIn.find((r) => r.from === o.id);
+                const out = relFor(story, c.id, o.id);
+                const inn = relFor(story, o.id, c.id);
                 const to = latest(out);
                 const ti = latest(inn);
                 const badges = (ts: typeof to) =>
@@ -309,14 +338,23 @@ export default function CharacterDetail() {
                     <Avatar c={nameOf(o.id)!} size={28} />
                     <b>{o.name || 'Unnamed'}</b>
                     <span className="small rel-mini-dirs">
-                      <span>
-                        <span className="muted">sees them as </span>
-                        {badges(to)}
-                      </span>
-                      <span>
-                        <span className="muted">they see {c.name || 'them'} as </span>
-                        {badges(ti)}
-                      </span>
+                      {out?.mutual ? (
+                        <span>
+                          <span className="muted">⇄ </span>
+                          {badges(to)}
+                        </span>
+                      ) : (
+                        <>
+                          <span>
+                            <span className="muted">sees them as </span>
+                            {badges(to)}
+                          </span>
+                          <span>
+                            <span className="muted">they see {c.name || 'them'} as </span>
+                            {badges(ti)}
+                          </span>
+                        </>
+                      )}
                     </span>
                   </div>
                 );

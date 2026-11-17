@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { pathFor, useStoryCtx } from '../storyContext';
 import { Avatar, Field, ImagePick, TagInput } from '../components/ui';
@@ -7,6 +8,7 @@ import { makeStory, makeUniverse, STATUSES, statusInfo } from '../defaults';
 import { move } from '../util';
 import { setStoryUniverse, storiesIn } from '../universe';
 import type { Story, StoryStatus } from '../types';
+import { groupCharacters } from '../categories';
 
 export function StatusPicker({ value, onChange }: { value: StoryStatus; onChange: (s: StoryStatus) => void }) {
   const info = statusInfo(value);
@@ -53,6 +55,40 @@ function UniversePicker({ story }: { story: Story }) {
   );
 }
 
+/** The story's main Milanote board: paste it once, then it's a button everywhere. */
+function MilanoteField({ story }: { story: Story }) {
+  const { upd } = useStoryCtx();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(story.milanoteUrl);
+  const save = () => {
+    const v = draft.trim();
+    upd((s) => void (s.milanoteUrl = v && !/^[a-z]+:\/\//i.test(v) ? 'https://' + v : v));
+    setEditing(false);
+  };
+  if (story.milanoteUrl && !editing)
+    return (
+      <div className="milanote-row">
+        <a className="btn milanote-btn" href={story.milanoteUrl} target="_blank" rel="noreferrer">📌 Open Milanote board</a>
+        <button className="btn small ghost" onClick={() => { setDraft(story.milanoteUrl); setEditing(true); }}>Change</button>
+      </div>
+    );
+  return (
+    <div className="milanote-row">
+      <span aria-hidden>📌</span>
+      <input
+        className="input slim"
+        style={{ flex: 1, minWidth: 0 }}
+        placeholder="Paste this story's Milanote board link (Share → Copy link)"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && save()}
+      />
+      <button className="btn small primary" disabled={!draft.trim() && !story.milanoteUrl} onClick={save}>{draft.trim() ? 'Save' : 'Remove'}</button>
+      {editing && <button className="btn small ghost" onClick={() => setEditing(false)}>Cancel</button>}
+    </div>
+  );
+}
+
 export default function Overview() {
   const { story, upd, base } = useStoryCtx();
   if (story.kind === 'universe') return <UniverseOverview />;
@@ -71,6 +107,7 @@ export default function Overview() {
             <UniversePicker story={story} />
           </div>
           <TagInput tags={story.genres} onChange={(g) => upd((s) => void (s.genres = g))} placeholder="+ genre / tag" />
+          <MilanoteField story={story} />
           <div className="stat-row">
             <Link to={base + '/characters'} className="stat"><b>{story.characters.length}</b> characters</Link>
             <Link to={base + '/relationships'} className="stat"><b>{story.relationships.length}</b> relationships</Link>
@@ -81,8 +118,8 @@ export default function Overview() {
       </div>
 
       <section className="card">
-        <h2 className="sec-title">Boards & links</h2>
-        <Links links={story.links} onChange={(l) => upd((s) => void (s.links = l))} />
+        <h2 className="sec-title">Other links</h2>
+        <Links links={story.links} onChange={(l) => upd((s) => void (s.links = l))} addLabel="+ Add a link" hint="Pinterest, Google Docs, Spotify, extra Milanote boards…" />
       </section>
 
       <section className="card">
@@ -113,15 +150,20 @@ function Cast({ story, base, title = 'Cast' }: { story: Story; base: string; tit
   return (
     <section className="card">
       <h2 className="sec-title">{title}</h2>
-      <div className="cast-row">
-        {story.characters.map((c) => (
-          <Link key={c.id} to={`${base}/characters/${c.id}`} className="cast">
-            <Avatar c={c} size={64} />
-            <span>{c.name || 'Unnamed'}</span>
-            {c.role && <span className="muted small">{c.role}</span>}
-          </Link>
-        ))}
-      </div>
+      {groupCharacters(story, story.characters).map((g, gi) => (
+        <div key={g.cat?.id ?? 'none' + gi} className="cast-group">
+          {story.charCategories.length > 0 && <h3 className="cast-group-title" style={g.cat ? { color: g.cat.color } : undefined}>{g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Others'}</h3>}
+          <div className="cast-row">
+            {g.chars.map((c) => (
+              <Link key={c.id} to={`${base}/characters/${c.id}`} className="cast">
+                <Avatar c={c} size={64} />
+                <span>{c.name || 'Unnamed'}</span>
+                {c.role && <span className="muted small">{c.role}</span>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
@@ -149,6 +191,7 @@ function UniverseOverview() {
           <Field className="h-title" value={u.title} placeholder="Universe name" onChange={(v) => upd((s) => void (s.title = v))} />
           <Field className="h-tagline" value={u.tagline} placeholder="What ties these stories together?" onChange={(v) => upd((s) => void (s.tagline = v))} />
           <TagInput tags={u.genres} onChange={(g) => upd((s) => void (s.genres = g))} placeholder="+ genre / tag" />
+          <MilanoteField story={u} />
           <div className="stat-row">
             <span className="stat"><b>{books.length}</b> {books.length === 1 ? 'story' : 'stories'}</span>
             <Link to={base + '/characters'} className="stat"><b>{u.characters.length}</b> shared characters</Link>
@@ -211,8 +254,8 @@ function UniverseOverview() {
       </section>
 
       <section className="card">
-        <h2 className="sec-title">Boards & links</h2>
-        <Links links={u.links} onChange={(l) => upd((s) => void (s.links = l))} />
+        <h2 className="sec-title">Other links</h2>
+        <Links links={u.links} onChange={(l) => upd((s) => void (s.links = l))} addLabel="+ Add a link" hint="Pinterest, Google Docs, Spotify, extra Milanote boards…" />
       </section>
 
       <section className="card">
