@@ -12,6 +12,7 @@ const TAB_ICONS: Record<TabKey, string> = {
   characters: '👤',
   relationships: '💞',
   plot: '🧵',
+  chapters: '✍️',
   world: '🗺️',
   songs: '🎵',
 };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLibrary } from '../store';
-import { makeStory, makeUniverse, normalizeLibrary, normalizeStory, STATUSES, statusInfo, THEME_PRESETS } from '../defaults';
+import { makeStory, makeUniverse, normalizeChapter, normalizeLibrary, normalizeStory, STATUSES, statusInfo, THEME_PRESETS } from '../defaults';
 import { download, ensureFonts, fontStack, pickJsonFile, uid } from '../util';
 import { Field, Modal } from '../components/ui';
 import type { Story, StoryStatus, Theme } from '../types';
@@ -103,12 +103,20 @@ export default function LibraryPage() {
               d.universes.push({ ...u, id: uRemap.get(u.id) ?? u.id });
             }
             const ids = new Set(d.stories.map((s) => s.id));
-            for (const s of l.stories)
-              d.stories.push({ ...s, id: ids.has(s.id) ? uid() : s.id, universeId: s.universeId && (uRemap.get(s.universeId) ?? s.universeId) });
+            const sRemap = new Map<string, string>();
+            for (const s of l.stories) {
+              const id = ids.has(s.id) ? uid() : s.id;
+              sRemap.set(s.id, id);
+              d.stories.push({ ...s, id, universeId: s.universeId && (uRemap.get(s.universeId) ?? s.universeId) });
+            }
+            const cIds = new Set(d.chapters.map((c) => c.id));
+            for (const c of l.chapters) d.chapters.push({ ...c, id: cIds.has(c.id) ? uid() : c.id, storyId: sRemap.get(c.storyId) ?? c.storyId });
           });
         } else if (confirm('Replace everything? Your current stories will be deleted.')) replace(l);
       } else if (data?.title !== undefined && data?.theme) {
         const s = normalizeStory(data);
+        const chapters = Array.isArray(data.chapters) ? data.chapters.map(normalizeChapter) : [];
+        delete (s as any).chapters;
         update((d) => {
           if (s.kind === 'universe') {
             if (d.universes.some((x) => x.id === s.id)) s.id = uid();
@@ -117,6 +125,8 @@ export default function LibraryPage() {
             if (d.stories.some((x) => x.id === s.id)) s.id = uid();
             if (s.universeId && !d.universes.some((u) => u.id === s.universeId)) s.universeId = undefined;
             d.stories.unshift(s);
+            const cIds = new Set(d.chapters.map((c) => c.id));
+            for (const c of chapters) d.chapters.push({ ...c, id: cIds.has(c.id) ? uid() : c.id, storyId: s.id });
           }
         });
       } else throw new Error();

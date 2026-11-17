@@ -1,4 +1,4 @@
-import type { Arc, FamilyRole, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
+import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
 export const THEME_PRESETS: { name: string; theme: Theme }[] = [
@@ -20,6 +20,7 @@ export const DEFAULT_TABS: TabConfig[] = [
   { key: 'characters', label: 'Characters', hidden: false },
   { key: 'relationships', label: 'Relationships', hidden: false },
   { key: 'plot', label: 'Plot', hidden: false },
+  { key: 'chapters', label: 'Chapters', hidden: false },
   { key: 'world', label: 'World', hidden: false },
   { key: 'songs', label: 'Songs', hidden: false },
 ];
@@ -209,7 +210,7 @@ export const statusInfo = (s: StoryStatus) => STATUSES.find((x) => x.key === s) 
 export function makeUniverse(name = 'New Universe', theme?: Theme): Story {
   const u = makeStory(name, theme);
   u.kind = 'universe';
-  u.tabs = u.tabs.map((t) => ({ ...t, hidden: t.key === 'plot', label: t.key === 'characters' ? 'Shared cast' : t.label }));
+  u.tabs = u.tabs.map((t) => ({ ...t, hidden: t.key === 'plot' || t.key === 'chapters', label: t.key === 'characters' ? 'Shared cast' : t.label }));
   u.arcs = [];
   u.questions = [];
   return u;
@@ -253,10 +254,13 @@ export function normalizeStory(raw: Partial<Story>): Story {
   const s = { ...base, ...raw } as Story;
   s.theme = { ...base.theme, ...(raw.theme ?? {}) };
   const tabs = Array.isArray(raw.tabs) ? raw.tabs : [];
-  s.tabs = [
-    ...tabs.filter((t) => DEFAULT_TABS.some((d) => d.key === t.key)),
-    ...DEFAULT_TABS.filter((d) => !tabs.some((t) => t.key === d.key)).map((t) => ({ ...t })),
-  ];
+  // keep the user's tab order, slotting any new pages in after the page they normally follow
+  s.tabs = tabs.filter((t) => DEFAULT_TABS.some((d) => d.key === t.key)).map((t) => ({ ...t }));
+  DEFAULT_TABS.forEach((d, i) => {
+    if (s.tabs.some((t) => t.key === d.key)) return;
+    const prev = i > 0 ? s.tabs.findIndex((t) => t.key === DEFAULT_TABS[i - 1].key) : -1;
+    s.tabs.splice(prev + 1, 0, { ...d });
+  });
   if (s.kind !== 'universe') s.kind = 'story';
   if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
   if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
@@ -264,6 +268,10 @@ export function normalizeStory(raw: Partial<Story>): Story {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
+  if (s.kind === 'universe') {
+    const ch = s.tabs.find((t) => t.key === 'chapters');
+    if (ch && !tabs.some((t) => t.key === 'chapters')) ch.hidden = true;
+  }
   if (!Array.isArray(s.moments) || !s.moments.length) s.moments = defaultMoments();
   if (!Array.isArray(s.relMeters)) s.relMeters = defaultMeters();
   if (!s.characterArcs || typeof s.characterArcs !== 'object') s.characterArcs = {};
@@ -278,7 +286,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
 }
 
 export function emptyLibrary(): Library {
-  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], metaUpdatedAt: 0, tombstones: {} };
+  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], chapters: [], metaUpdatedAt: 0, tombstones: {} };
 }
 
 export function normalizeLibrary(raw: unknown): Library | null {
@@ -289,8 +297,114 @@ export function normalizeLibrary(raw: unknown): Library | null {
     version: 1,
     siteTitle: r.siteTitle || "Writer's Oatmeal",
     stories: r.stories.map(normalizeStory),
+    chapters: Array.isArray(r.chapters) ? r.chapters.map(normalizeChapter) : [],
     universes: Array.isArray(r.universes) ? r.universes.map((u) => ({ ...normalizeStory(u), kind: 'universe' as const })) : [],
     metaUpdatedAt: typeof r.metaUpdatedAt === 'number' ? r.metaUpdatedAt : 0,
     tombstones: r.tombstones && typeof r.tombstones === 'object' ? r.tombstones : {},
   };
+}
+
+export const CHAPTER_STATUSES: { key: ChapterStatus; label: string; color: string }[] = [
+  { key: 'idea', label: 'Idea', color: '#e9c46a' },
+  { key: 'outline', label: 'Outlined', color: '#7aa6d8' },
+  { key: 'draft', label: 'Draft', color: '#e76f51' },
+  { key: 'revised', label: 'Revised', color: '#9b5de5' },
+  { key: 'final', label: 'Final', color: '#2a9d8f' },
+];
+
+export function makeChapter(storyId: string, order: number, title = ''): Chapter {
+  const now = Date.now();
+  return { id: uid(), storyId, title, order, status: 'idea', summary: '', html: '', words: 0, comments: [], createdAt: now, updatedAt: now };
+}
+
+export function normalizeChapter(raw: Partial<Chapter>): Chapter {
+  const base = makeChapter(raw.storyId ?? '', 0);
+  const c = { ...base, ...raw } as Chapter;
+  if (!CHAPTER_STATUSES.some((x) => x.key === c.status)) c.status = 'idea';
+  if (!Array.isArray(c.comments)) c.comments = [];
+  if (typeof c.html !== 'string') c.html = '';
+  if (typeof c.order !== 'number') c.order = 0;
+  return c;
+}
+
+export const countWords = (text: string) => (text.match(/[\p{L}\p{N}’'-]+/gu) ?? []).length;
+
+// ---------------------------------------------------------------- story structures
+
+type BeatSeed = [name: string, pct: number, guide: string];
+
+export const STRUCTURES: { id: string; name: string; blurb: string; beats: BeatSeed[] }[] = [
+  {
+    id: 'three-act',
+    name: 'Three-Act Structure',
+    blurb: 'Setup, confrontation, resolution. The classic shape.',
+    beats: [
+      ['Setup', 0, 'Introduce the hero, their world and what they want.'],
+      ['Inciting incident', 10, 'Something disrupts normal life and starts the story.'],
+      ['Plot point 1', 25, 'The hero commits; there is no going back. Act 2 begins.'],
+      ['Rising action', 35, 'Obstacles escalate; allies and enemies take shape.'],
+      ['Midpoint', 50, 'A revelation or reversal changes the game.'],
+      ['Plot point 2 / crisis', 75, 'Everything falls apart. Act 3 begins.'],
+      ['Climax', 88, 'The final confrontation. The hero acts on what they learned.'],
+      ['Resolution', 96, 'The new normal. Loose ends tied.'],
+    ],
+  },
+  {
+    id: 'save-the-cat',
+    name: 'Save the Cat',
+    blurb: "Blake Snyder's 15 beats: very precise and popular for pacing.",
+    beats: [
+      ['Opening image', 0, 'A snapshot of the hero and their world before the change.'],
+      ['Theme stated', 5, 'Someone hints at the lesson the hero needs to learn.'],
+      ['Set-up', 6, "Show the hero's flaws, what they want, and what's missing."],
+      ['Catalyst', 10, 'The life-changing event.'],
+      ['Debate', 12, 'The hero hesitates. Should they go?'],
+      ['Break into Two', 20, 'The hero chooses to enter the new world.'],
+      ['B Story', 22, 'A new relationship that carries the theme (often love interest or mentor).'],
+      ['Fun and games', 30, 'The promise of the premise: what the reader came for.'],
+      ['Midpoint', 50, 'False victory or false defeat; the stakes rise.'],
+      ['Bad guys close in', 55, 'External pressure and internal doubts tighten.'],
+      ['All is lost', 75, 'The lowest point; something or someone is lost.'],
+      ['Dark night of the soul', 78, 'The hero wallows, then finds the truth.'],
+      ['Break into Three', 80, 'The solution, combining A story and B story.'],
+      ['Finale', 85, 'The hero proves they have changed.'],
+      ['Final image', 99, 'A mirror of the opening image, showing the change.'],
+    ],
+  },
+  {
+    id: 'heros-journey',
+    name: "Hero's Journey",
+    blurb: '12 stages of a quest: great for fantasy and adventure.',
+    beats: [
+      ['Ordinary world', 0, 'The hero at home, unaware of what is coming.'],
+      ['Call to adventure', 8, 'A challenge or quest appears.'],
+      ['Refusal of the call', 12, 'Fear or duty holds them back.'],
+      ['Meeting the mentor', 17, 'Guidance, training or a gift.'],
+      ['Crossing the threshold', 25, 'Leaving the known world behind.'],
+      ['Tests, allies, enemies', 35, 'Learning the rules of the new world.'],
+      ['Approach to the inmost cave', 45, 'Preparing for the central ordeal.'],
+      ['The ordeal', 50, 'Facing the greatest fear; a death and rebirth.'],
+      ['Reward', 60, 'Seizing the sword: the prize, knowledge or reconciliation.'],
+      ['The road back', 75, 'Consequences chase the hero home.'],
+      ['Resurrection', 90, 'A final test where everything is at stake.'],
+      ['Return with the elixir', 97, 'Home again, changed, bringing something back.'],
+    ],
+  },
+  {
+    id: 'kishotenketsu',
+    name: 'Kishōtenketsu',
+    blurb: 'Four acts built on contrast and a twist rather than conflict.',
+    beats: [
+      ['Ki: introduction', 0, 'Introduce characters and setting.'],
+      ['Shō: development', 25, 'Develop them; nothing major changes yet.'],
+      ['Ten: twist', 50, 'An unexpected turn that recasts everything.'],
+      ['Ketsu: reconciliation', 75, 'Bring the threads together in a new understanding.'],
+    ],
+  },
+];
+
+export function makeStructure(templateId: string): Structure {
+  const t = STRUCTURES.find((x) => x.id === templateId);
+  if (!t) return { templateId: 'custom', name: 'My structure', beats: [{ id: uid(), name: 'Beginning', guide: '', pct: 0, notes: '', pointIds: [] }] };
+  return { templateId: t.id, name: t.name, beats: t.beats.map(([name, pct, guide]) => ({ id: uid(), name, pct, guide, notes: '', pointIds: [] })) };
 }

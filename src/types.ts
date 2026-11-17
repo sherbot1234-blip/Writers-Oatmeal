@@ -12,7 +12,7 @@ export interface Theme {
   bgOverlay: number;
 }
 
-export type TabKey = 'overview' | 'songs' | 'characters' | 'relationships' | 'plot' | 'world';
+export type TabKey = 'overview' | 'songs' | 'characters' | 'relationships' | 'plot' | 'chapters' | 'world';
 
 export interface TabConfig {
   key: TabKey;
@@ -147,6 +147,52 @@ export interface PlotPoint {
   chapter: string;
   status: PlotStatus;
   characterIds: string[];
+  /** The chapter where this happens. */
+  chapterId?: string;
+}
+
+/** A beat in a story-structure template (Save the Cat, Hero's Journey…). */
+export interface Beat {
+  id: string;
+  name: string;
+  guide: string;
+  /** roughly how far through the story, 0–100 */
+  pct: number;
+  notes: string;
+  pointIds: string[];
+}
+
+export interface Structure {
+  templateId: string;
+  name: string;
+  beats: Beat[];
+}
+
+export type ChapterStatus = 'idea' | 'outline' | 'draft' | 'revised' | 'final';
+
+export interface ChapterComment {
+  id: string;
+  text: string;
+  /** the passage it was left on */
+  quote: string;
+  resolved: boolean;
+  createdAt: number;
+}
+
+/** Chapters are stored apart from their story so typing only syncs the chapter. */
+export interface Chapter {
+  id: string;
+  storyId: string;
+  title: string;
+  order: number;
+  status: ChapterStatus;
+  povId?: string;
+  summary: string;
+  html: string;
+  words: number;
+  comments: ChapterComment[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Arc {
@@ -207,6 +253,7 @@ export interface Story {
   /** character id → their arc in this story */
   characterArcs: Record<string, CharArc>;
   arcs: Arc[];
+  structure?: Structure;
   worldImages: WorldImage[];
   questions: Question[];
   createdAt: number;
@@ -218,6 +265,7 @@ export interface Library {
   siteTitle: string;
   stories: Story[];
   universes: Story[];
+  chapters: Chapter[];
   /** When siteTitle (and future library settings) last changed — used by sync. */
   metaUpdatedAt: number;
   /** Deleted story id → when it was deleted, so deletions sync to other devices. */

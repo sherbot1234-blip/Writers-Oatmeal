@@ -129,7 +129,7 @@ export default function Settings() {
           <button
             className="btn"
             // exported stories are self-contained: shared characters come along as normal characters
-            onClick={() => download(`${slug(story.title)}.json`, { ...story, universeId: undefined, sharedCharacterIds: [] })}
+            onClick={() => download(`${slug(story.title)}.json`, { ...story, universeId: undefined, sharedCharacterIds: [], chapters: lib.chapters.filter((c) => c.storyId === story.id) })}
           >
             Export this {noun}
           </button>
@@ -139,7 +139,18 @@ export default function Settings() {
               onClick={() => {
                 const own = lib.stories.find((s) => s.id === story.id)!;
                 const copy = { ...structuredClone(own), id: uid(), title: story.title + ' (copy)', createdAt: Date.now(), updatedAt: Date.now() };
-                update((d) => void d.stories.unshift(copy));
+                // chapters come along too, and plot points keep pointing at the right (copied) chapter
+                const chMap = new Map<string, string>();
+                const chCopies = lib.chapters.filter((c) => c.storyId === story.id).map((c) => {
+                  const id = uid();
+                  chMap.set(c.id, id);
+                  return { ...structuredClone(c), id, storyId: copy.id, createdAt: Date.now(), updatedAt: Date.now() };
+                });
+                copy.arcs.forEach((a) => a.points.forEach((p) => p.chapterId && (p.chapterId = chMap.get(p.chapterId))));
+                update((d) => {
+                  d.stories.unshift(copy);
+                  d.chapters.push(...chCopies);
+                });
                 nav('/story/' + copy.id);
               }}
             >
@@ -151,12 +162,15 @@ export default function Settings() {
             onClick={() => {
               const msg = isUniverse
                 ? `Delete the universe “${story.title}”? Its stories are kept, and each keeps its own copy of the shared characters it uses.`
-                : `Delete “${story.title}” forever? Export it first if you might want it back.`;
+                : `Delete “${story.title}” and all its chapters forever? Export it first if you might want it back.`;
               if (!confirm(msg)) return;
               nav('/');
               update((d) => {
                 if (isUniverse) deleteUniverse(d, story.id);
-                else d.stories = d.stories.filter((s) => s.id !== story.id);
+                else {
+                  d.stories = d.stories.filter((s) => s.id !== story.id);
+                  d.chapters = d.chapters.filter((c) => c.storyId !== story.id);
+                }
               });
             }}
           >

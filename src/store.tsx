@@ -27,22 +27,24 @@ const LibraryContext = createContext<Ctx | null>(null);
  */
 function stamp(prev: Library, next: Library): Library {
   const now = Date.now();
-  const touched: [('stories' | 'universes'), string][] = [];
+  const touched: [('stories' | 'universes' | 'chapters'), string][] = [];
   const removed: string[] = [];
-  for (const [key, kind] of [['stories', 'story'], ['universes', 'universe']] as const) {
-    const before = new Map(prev[key].map((x) => [x.id, x]));
-    const ids = new Set(next[key].map((x) => x.id));
-    for (const x of next[key]) {
+  for (const [key, kind] of [['stories', 'story'], ['universes', 'universe'], ['chapters', 'chapter']] as const) {
+    const prevList: { id: string; updatedAt: number }[] = prev[key];
+    const nextList: { id: string; updatedAt: number }[] = next[key];
+    const before = new Map(prevList.map((x) => [x.id, x]));
+    const ids = new Set(nextList.map((x) => x.id));
+    for (const x of nextList) {
       const old = before.get(x.id);
       if (old && old !== x && old.updatedAt === x.updatedAt) touched.push([key, x.id]);
     }
-    for (const x of prev[key]) if (!ids.has(x.id)) removed.push(docId(kind, x.id));
+    for (const x of prevList) if (!ids.has(x.id)) removed.push(docId(kind, x.id));
   }
   const titleChanged = prev.siteTitle !== next.siteTitle;
   if (!touched.length && !removed.length && !titleChanged) return next;
   return produce(next, (d) => {
     for (const [key, id] of touched) {
-      const x = d[key].find((y) => y.id === id);
+      const x = (d[key] as { id: string; updatedAt: number }[]).find((y) => y.id === id);
       if (x) x.updatedAt = Math.max(now, x.updatedAt + 1);
     }
     removed.forEach((id) => (d.tombstones[id] = now));

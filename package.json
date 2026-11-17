@@ -10,6 +10,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "@tiptap/core": "^2.27.3",
+    "@tiptap/extension-placeholder": "^2.27.3",
+    "@tiptap/extension-text-align": "^2.27.3",
+    "@tiptap/extension-underline": "^2.27.3",
+    "@tiptap/pm": "^2.27.3",
+    "@tiptap/react": "^2.27.3",
+    "@tiptap/starter-kit": "^2.27.3",
     "idb-keyval": "^6.2.1",
     "immer": "^10.1.1",
     "react": "^18.3.1",

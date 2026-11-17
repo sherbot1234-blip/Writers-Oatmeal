@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { LibraryProvider } from './store';
@@ -12,6 +12,14 @@ import CharacterDetail from './pages/CharacterDetail';
 import Relationships from './pages/Relationships';
 import Plot from './pages/Plot';
 import World from './pages/World';
+import Chapters from './pages/Chapters';
+// the editor is big, so it only loads when you open a chapter
+const ChapterEditor = lazy(() => import('./pages/ChapterEditor'));
+const editorPage = (
+  <Suspense fallback={<p className="muted">Opening chapter…</p>}>
+    <ChapterEditor />
+  </Suspense>
+);
 import Settings from './pages/Settings';
 import './styles.css';
 
@@ -30,6 +38,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="relationships" element={<Relationships />} />
             <Route path="plot" element={<Plot />} />
             <Route path="world" element={<World />} />
+            <Route path="chapters" element={<Chapters />} />
+            <Route path="chapters/:chapterId" element={editorPage} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="/universe/:storyId" element={<StoryLayout />}>
@@ -40,6 +50,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="relationships" element={<Relationships />} />
             <Route path="plot" element={<Plot />} />
             <Route path="world" element={<World />} />
+            <Route path="chapters" element={<Chapters />} />
+            <Route path="chapters/:chapterId" element={editorPage} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<LibraryPage />} />
