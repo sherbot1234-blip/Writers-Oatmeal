@@ -172,6 +172,7 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     theme: theme ? { ...theme } : { ...THEME_PRESETS[0].theme },
     tabs: DEFAULT_TABS.map((t) => ({ ...t })),
     playlistUrl: '',
+    links: [],
     songs: [],
     characters: [],
     characterTemplate: defaultCharacterTemplate(),
@@ -195,7 +196,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
     ...tabs.filter((t) => DEFAULT_TABS.some((d) => d.key === t.key)),
     ...DEFAULT_TABS.filter((d) => !tabs.some((t) => t.key === d.key)).map((t) => ({ ...t })),
   ];
-  for (const k of ['genres', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  for (const k of ['genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
@@ -203,12 +204,18 @@ export function normalizeStory(raw: Partial<Story>): Story {
 }
 
 export function emptyLibrary(): Library {
-  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [] };
+  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], metaUpdatedAt: 0, tombstones: {} };
 }
 
 export function normalizeLibrary(raw: unknown): Library | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Partial<Library>;
   if (!Array.isArray(r.stories)) return null;
-  return { version: 1, siteTitle: r.siteTitle || "Writer's Oatmeal", stories: r.stories.map(normalizeStory) };
+  return {
+    version: 1,
+    siteTitle: r.siteTitle || "Writer's Oatmeal",
+    stories: r.stories.map(normalizeStory),
+    metaUpdatedAt: typeof r.metaUpdatedAt === 'number' ? r.metaUpdatedAt : 0,
+    tombstones: r.tombstones && typeof r.tombstones === 'object' ? r.tombstones : {},
+  };
 }

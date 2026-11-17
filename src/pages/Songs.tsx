@@ -1,17 +1,27 @@
 import { useState } from 'react';
 import { useStoryCtx } from '../storyContext';
 import { Avatar, CharacterChips, Empty, Field } from '../components/ui';
-import { move, parseSpotify, uid } from '../util';
+import { move, parseMedia, uid } from '../util';
 
-function SpotifyEmbed({ url, tall }: { url: string; tall?: boolean }) {
-  const ref = parseSpotify(url);
-  if (!ref) return null;
-  const big = tall || ref.type !== 'track' && ref.type !== 'episode';
+function Player({ url, tall }: { url: string; tall?: boolean }) {
+  const m = parseMedia(url);
+  if (!m) return null;
+  if (m.service === 'youtube')
+    return (
+      <iframe
+        className="spotify yt"
+        src={m.embed}
+        loading="lazy"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowFullScreen
+        title="YouTube player"
+      />
+    );
   return (
     <iframe
       className="spotify"
-      src={ref.embed}
-      height={big ? 380 : 80}
+      src={m.embed}
+      height={tall || !m.compact ? 380 : 80}
       loading="lazy"
       allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
       title="Spotify player"
@@ -40,20 +50,20 @@ export default function Songs() {
 
       <section className="card">
         <h2 className="sec-title">Story playlist</h2>
-        {story.playlistUrl && parseSpotify(story.playlistUrl) ? (
+        {story.playlistUrl && parseMedia(story.playlistUrl) ? (
           <>
-            <SpotifyEmbed url={story.playlistUrl} tall />
+            <Player url={story.playlistUrl} tall />
             <button className="btn small ghost" onClick={() => upd((s) => void (s.playlistUrl = ''))}>Remove playlist</button>
           </>
         ) : (
           <>
-            <p className="muted small">Paste a Spotify playlist or album link to embed it here. (In Spotify: ••• → Share → Copy link.)</p>
+            <p className="muted small">Paste a Spotify playlist/album link (••• → Share → Copy link) or a YouTube playlist link to play it here.</p>
             <div className="row gap">
-              <input className="input" placeholder="https://open.spotify.com/playlist/…" value={playlistDraft} onChange={(e) => setPlaylistDraft(e.target.value)} />
+              <input className="input" placeholder="Spotify or YouTube playlist link" value={playlistDraft} onChange={(e) => setPlaylistDraft(e.target.value)} />
               <button
                 className="btn"
                 onClick={() => {
-                  if (!parseSpotify(playlistDraft)) return alert("That doesn't look like a Spotify link.");
+                  if (!parseMedia(playlistDraft)) return alert("That doesn't look like a Spotify or YouTube link.");
                   upd((s) => void (s.playlistUrl = playlistDraft.trim()));
                   setPlaylistDraft('');
                 }}
@@ -73,7 +83,7 @@ export default function Songs() {
         <ol className="song-list">
           {story.songs.map((song, i) => {
             const chars = story.characters.filter((c) => song.characterIds.includes(c.id));
-            const sp = parseSpotify(song.url);
+            const sp = parseMedia(song.url);
             const isEditing = editing === song.id;
             return (
               <li key={song.id} className="card song">
@@ -84,7 +94,7 @@ export default function Songs() {
                       <div className="song-edit">
                         <input className="input" autoFocus placeholder="Song title" value={song.title} onChange={(e) => upd((s) => void (s.songs[i].title = e.target.value))} />
                         <input className="input" placeholder="Artist" value={song.artist} onChange={(e) => upd((s) => void (s.songs[i].artist = e.target.value))} />
-                        <input className="input" placeholder="Spotify (or any) link" value={song.url} onChange={(e) => upd((s) => void (s.songs[i].url = e.target.value))} />
+                        <input className="input" placeholder="Spotify or YouTube link" value={song.url} onChange={(e) => upd((s) => void (s.songs[i].url = e.target.value))} />
                         <label className="lbl">Who is this song about?</label>
                         <CharacterChips characters={story.characters} selected={song.characterIds} onChange={(ids) => upd((s) => void (s.songs[i].characterIds = ids))} />
                       </div>
@@ -122,7 +132,7 @@ export default function Songs() {
                     </div>
                   </div>
                 </div>
-                {playing === song.id && sp && <SpotifyEmbed url={song.url} />}
+                {playing === song.id && sp && <Player url={song.url} />}
               </li>
             );
           })}

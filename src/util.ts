@@ -53,6 +53,25 @@ export function parseSpotify(input: string): SpotifyRef | null {
   return { type: m[1], id: m[2], embed: `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator` };
 }
 
+export interface MediaRef {
+  service: 'spotify' | 'youtube';
+  embed: string;
+  /** compact = a single track bar; otherwise a taller player */
+  compact: boolean;
+}
+
+/** Spotify or YouTube link → embeddable player URL. */
+export function parseMedia(input: string): MediaRef | null {
+  const sp = parseSpotify(input);
+  if (sp) return { service: 'spotify', embed: sp.embed, compact: sp.type === 'track' || sp.type === 'episode' };
+  const s = (input || '').trim();
+  const list = s.match(/[?&]list=([A-Za-z0-9_-]+)/);
+  const vid = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/|music\.youtube\.com\/watch\?(?:.*&)?v=)([A-Za-z0-9_-]{11})/);
+  if (vid) return { service: 'youtube', embed: `https://www.youtube-nocookie.com/embed/${vid[1]}${list ? '?list=' + list[1] : ''}`, compact: false };
+  if (list && /youtube\.com/.test(s)) return { service: 'youtube', embed: `https://www.youtube-nocookie.com/embed/videoseries?list=${list[1]}`, compact: false };
+  return null;
+}
+
 export function move<T>(arr: T[], from: number, to: number) {
   if (to < 0 || to >= arr.length) return;
   const [item] = arr.splice(from, 1);

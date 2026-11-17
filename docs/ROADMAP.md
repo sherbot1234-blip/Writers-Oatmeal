@@ -1,0 +1,32 @@
+# Writer's Oatmeal: vision & roadmap
+
+A **private**, **cosy and whimsical** home for 20+ stories, synced across all my devices.
+Each story looks completely different from the others. **Milanote** stays my main note-taking tool, and the site links out to my boards.
+
+## The stories that shape the design
+
+| Story | Genre | Feel | Style-pack ideas |
+|---|---|---|---|
+| **Arcane Legends Eternal** | Sci‑fi / fantasy, trapped in a video game with 300 levels to escape | Swings between whimsical/light and dark | "Game HUD" pack: pixel or RPG-menu cards, XP bars for stats, a **level tracker (1–300)** as a plot view, and a **light ↔ dark mood switch** so the page can flip between the two tones |
+| **Secret Below** | Fantasy, modern day: what if dragons were real today? A young woman who believes in dragons joins a dragon-riding family | Wonder, modern-meets-myth | "Field Journal" pack: sketchbook paper, handwritten notes and taped photos; a **dragon bestiary** (species pages, rider ↔ dragon bonds as a relationship type) |
+| **Wolf in Sheep Clothing** | Thriller / crime / sports. Young adults closer to a serial killer than they think. Hayashi was adopted by the killer (who claims to be his aunt, though neither parent had siblings). Yumiko's mother is lead detective | Tense, investigative | "Case File" pack: manila folders, typewriter fonts, evidence-board relationship web with red string; **secrets / "what each character knows"** tracking; a case timeline next to the sports season |
+
+## Done
+
+- [x] Library, per-story themes (colours, fonts, background), rename/hide/reorder pages
+- [x] Character cards with custom sections (overview chart, stat radar, text, tags, images) and a per-story card layout
+- [x] Relationships: directional cards, templates, custom types, web view
+- [x] Plot: arcs, drag and drop, status, outline
+- [x] World: map/image gallery, custom questions and question bank
+- [x] Songs: Spotify + YouTube players
+- [x] Cloud sync (Supabase): private login, images in private storage, conflict copies
+- [x] Milanote / outside links on stories and characters
+
+## Next, in order
+
+1. **Bookshelf + universes**: bookshelf-style library (spines and covers), story status (idea → finished / on hold), search, series/universes with **shared characters and places** across stories.
+2. **Characters & relationships**: looks/eras per character, quotes & voice, character arc linked to plot points; relationships with multiple labels, intensity meters (trust, affection, tension, attraction), changes over time (timeline slider), auto family tree.
+3. **Writing & plot**: chapter editor with formatting, a side panel (characters/plot/world while writing), comments and notes; plot timeline with arc lanes; structure templates (Three-Act, Save the Cat, Hero's Journey, Kishōtenketsu); plot points ↔ chapters.
+4. **Music**: theme songs on character cards, songs per scene or chapter, **Spotify playlist import** (I have Premium).
+5. **World**: interactive maps with pins, wiki-style lore pages (places, factions, items, creatures, magic systems), world history timeline, glossary.
+6. **Style packs & custom pages**: full style packs (layout, borders, ornaments, textures, header banners) with per-part overrides; add custom pages per story; a more whimsical default look for the whole site.

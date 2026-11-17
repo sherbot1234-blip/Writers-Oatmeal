@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
 import { Avatar, Field, ImagePick, TagInput } from '../components/ui';
+import { Links } from '../components/Links';
 
 export default function Overview() {
   const { story, upd } = useStoryCtx();
@@ -34,6 +35,11 @@ export default function Overview() {
           </div>
         </div>
       </div>
+
+      <section className="card">
+        <h2 className="sec-title">Boards & links</h2>
+        <Links links={story.links} onChange={(l) => upd((s) => void (s.links = l))} />
+      </section>
 
       <section className="card">
         <h2 className="sec-title">Synopsis</h2>

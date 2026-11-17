@@ -5,6 +5,7 @@ import { makeStory, normalizeLibrary, normalizeStory, THEME_PRESETS } from '../d
 import { download, ensureFonts, fontStack, pickJsonFile, uid } from '../util';
 import { Field, Modal } from '../components/ui';
 import type { Story, Theme } from '../types';
+import { CloudButton } from '../sync/Cloud';
 
 export function themeVars(t: Theme): React.CSSProperties {
   return {
@@ -94,7 +95,8 @@ export default function LibraryPage() {
             {lib.stories.length} {lib.stories.length === 1 ? 'story' : 'stories'} · <SaveBadge state={saveState} />
           </p>
         </div>
-        <div className="row gap">
+        <div className="row gap wrap">
+          <CloudButton />
           <button className="btn ghost" onClick={importFile}>Import</button>
           <button className="btn ghost" onClick={() => download(`writers-oatmeal-backup-${new Date().toISOString().slice(0, 10)}.json`, lib)} disabled={!lib.stories.length}>
             Back up all
@@ -119,7 +121,7 @@ export default function LibraryPage() {
       )}
 
       <p className="muted small lib-foot">
-        Everything is saved in this browser. Use <b>Back up all</b> now and then to keep a copy, or to move your stories to another device.
+        Your stories are saved on this device, and in the cloud when you're signed in (☁️). <b>Back up all</b> downloads a copy you can keep anywhere.
       </p>
 
       {creating && (

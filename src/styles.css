@@ -429,3 +429,23 @@ textarea.input { resize: vertical; }
   .type-row > .muted { display: none; }
   .lib-title { font-size: 1.8rem; }
 }
+
+/* ---------- cloud & links ---------- */
+.cloud-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 99px; padding: 5px 12px; cursor: pointer; font-size: 0.82rem; white-space: nowrap; }
+.cloud-btn:hover { border-color: var(--accent); }
+.cloud-btn.synced { border-color: color-mix(in srgb, #2a9d8f 60%, var(--line)); }
+.cloud-btn.error { border-color: #c0392b; color: #c0392b; }
+.cloud-btn.syncing span:first-child { display: inline-block; animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spotify.yt { aspect-ratio: 16/9; height: auto; }
+.links { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.link-chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 99px; background: var(--bg); font-size: 0.85rem; }
+.link-chip a { text-decoration: none; padding: 4px 4px 4px 11px; }
+.link-chip a:hover { color: var(--accent); }
+.link-chip button { border: none; background: none; cursor: pointer; color: var(--muted); padding: 0 9px 0 4px; }
+.link-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
+.link-add .input.slim { flex: 1; min-width: 160px; }
+@media (max-width: 760px) {
+  .cloud-label { display: none; }
+  .char-hero .links { justify-content: center; }
+}

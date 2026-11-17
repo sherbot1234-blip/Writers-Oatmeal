@@ -13,10 +13,25 @@ interface Ctx {
   lib: Library;
   update: (fn: LibUpdater) => void;
   replace: (lib: Library) => void;
+  /** For sync: replaces the library without recording deletions as local edits. */
+  applyRemote: (fn: (l: Library) => Library) => void;
   saveState: 'saved' | 'saving' | 'error';
 }
 
 const LibraryContext = createContext<Ctx | null>(null);
+
+/** Records deletions and settings changes so they can sync to other devices. */
+function stamp(prev: Library, next: Library): Library {
+  const ids = new Set(next.stories.map((s) => s.id));
+  const removed = prev.stories.filter((s) => !ids.has(s.id));
+  const titleChanged = prev.siteTitle !== next.siteTitle;
+  if (!removed.length && !titleChanged) return next;
+  const now = Date.now();
+  return produce(next, (d) => {
+    removed.forEach((s) => (d.tombstones[s.id] = now));
+    if (titleChanged) d.metaUpdatedAt = now;
+  });
+}
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const [lib, setLib] = useState<Library | null>(null);
@@ -57,11 +72,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onHide);
   }, [flush]);
 
-  const update = useCallback((fn: LibUpdater) => setLib((prev) => (prev ? produce(prev, fn) : prev)), []);
-  const replace = useCallback((l: Library) => setLib(l), []);
+  const update = useCallback((fn: LibUpdater) => setLib((prev) => (prev ? stamp(prev, produce(prev, fn)) : prev)), []);
+  const replace = useCallback((l: Library) => setLib((prev) => (prev ? stamp(prev, l) : l)), []);
+  const applyRemote = useCallback((fn: (l: Library) => Library) => setLib((prev) => (prev ? fn(prev) : prev)), []);
 
   if (!lib) return <div className="loading">Loading your stories…</div>;
-  return <LibraryContext.Provider value={{ lib, update, replace, saveState }}>{children}</LibraryContext.Provider>;
+  return <LibraryContext.Provider value={{ lib, update, replace, applyRemote, saveState }}>{children}</LibraryContext.Provider>;
 }
 
 export function useLibrary() {

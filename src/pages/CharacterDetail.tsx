@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
 import { Avatar, ColorPick, Field, ImagePick, Lightbox } from '../components/ui';
 import { SectionList } from '../components/Sections';
+import { Links } from '../components/Links';
 import { cloneSectionShape } from '../defaults';
 
 export default function CharacterDetail() {
@@ -61,6 +62,7 @@ export default function CharacterDetail() {
         <div className="char-hero-text">
           <Field className="h-title" value={c.name} placeholder="Character name" onChange={(v) => edit((ch) => void (ch.name = v))} />
           <Field className="h-tagline" value={c.role} placeholder="Role — protagonist, the mentor, comic relief…" onChange={(v) => edit((ch) => void (ch.role = v))} />
+          <Links links={c.links ?? []} onChange={(l) => edit((ch) => void (ch.links = l))} />
           <div className="row gap wrap" style={{ marginTop: 8 }}>
             <span className="row gap small">Colour <ColorPick value={c.color} onChange={(v) => edit((ch) => void (ch.color = v))} /></span>
             <div className="menu-wrap">

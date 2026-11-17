@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { LibraryProvider } from './store';
+import { CloudProvider } from './sync/Cloud';
 import LibraryPage from './pages/Library';
 import StoryLayout from './pages/StoryLayout';
 import Overview from './pages/Overview';
@@ -17,6 +18,7 @@ import './styles.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <LibraryProvider>
+      <CloudProvider>
       <HashRouter>
         <Routes>
           <Route path="/" element={<LibraryPage />} />
@@ -33,6 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="*" element={<LibraryPage />} />
         </Routes>
       </HashRouter>
+      </CloudProvider>
     </LibraryProvider>
   </React.StrictMode>,
 );

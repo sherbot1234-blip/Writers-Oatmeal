@@ -5,6 +5,7 @@ import { ensureFonts } from '../util';
 import { SaveBadge, themeVars } from './Library';
 import type { TabKey } from '../types';
 import type { StoryCtx } from '../storyContext';
+import { CloudButton } from '../sync/Cloud';
 
 const TAB_ICONS: Record<TabKey, string> = {
   overview: '📖',
@@ -48,6 +49,7 @@ export default function StoryLayout() {
         <Link to="/" className="back" title="All stories">← Library</Link>
         <Link to={`/story/${story.id}`} className="story-name">{story.title || 'Untitled'}</Link>
         <span className="muted small save"><SaveBadge state={saveState} /></span>
+        <CloudButton />
       </header>
       <nav className="tabs">
         {story.tabs

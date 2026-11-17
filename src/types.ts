@@ -56,6 +56,12 @@ export interface Section {
   images?: string[];
 }
 
+export interface LinkItem {
+  id: string;
+  label: string;
+  url: string;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -63,6 +69,7 @@ export interface Character {
   image?: string;
   color: string;
   sections: Section[];
+  links?: LinkItem[];
 }
 
 export interface RelType {
@@ -125,6 +132,7 @@ export interface Story {
   theme: Theme;
   tabs: TabConfig[];
   playlistUrl: string;
+  links: LinkItem[];
   songs: Song[];
   characters: Character[];
   characterTemplate: Section[];
@@ -141,4 +149,8 @@ export interface Library {
   version: 1;
   siteTitle: string;
   stories: Story[];
+  /** When siteTitle (and future library settings) last changed — used by sync. */
+  metaUpdatedAt: number;
+  /** Deleted story id → when it was deleted, so deletions sync to other devices. */
+  tombstones: Record<string, number>;
 }
