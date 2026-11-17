@@ -28,6 +28,7 @@ Each story looks completely different from the others. **Milanote** stays my mai
 - [x] Plot: timeline (arcs × chapters, drag and drop), structure templates (Three-Act, Save the Cat, Hero's Journey, Kishōtenketsu, custom), plot points linked to chapters
 - [x] Music: theme songs on character cards, songs linked to chapters & scenes, soundtrack by chapter, 🎵 tab while writing, Spotify playlist import (PKCE sign-in, no server)
 - [x] World: wiki pages (custom categories, facts, related pages, backlinks), clickable map pins linked to pages, world history timeline, glossary, all shareable at universe level and searchable while writing
+- [x] Style packs (Game HUD with Whimsy ↔ Dark moods, Field Journal, Case File, Parchment Scroll, Gothic, Cute Pastel, Comic Book, Starlight, Clean), fine-tuning of cards, textures, headings, ornaments, banner, second mood; custom pages from templates; cosier default look
 - [x] Universes / series: series order, shared characters (edit once, shows in every story), universe-level world, songs and relationships
 
 ## Next, in order
@@ -37,4 +38,6 @@ Each story looks completely different from the others. **Milanote** stays my mai
 3. *(done)* Writing & plot.
 4. *(done)* Music.
 5. *(done)* World.
-6. **Style packs & custom pages**: full style packs (layout, borders, ornaments, textures, header banners) with per-part overrides; add custom pages per story; a more whimsical default look for the whole site.
+6. *(done)* Style packs & custom pages.
+
+Everything on the original wish list is built. Ideas for later: word-count goals, version history for chapters, sharing a read-only story link.

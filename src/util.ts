@@ -107,7 +107,7 @@ export function pickJsonFile(): Promise<unknown> {
 
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'story';
 
-const loadedFonts = new Set<string>(['Inter', 'Lora']);
+const loadedFonts = new Set<string>(['Inter', 'Lora', 'Fredoka']);
 /** Lazily loads Google Fonts by family name. */
 export function ensureFonts(families: string[]) {
   const missing = families.filter((f) => f && !loadedFonts.has(f) && !SYSTEM_FONTS.includes(f));
@@ -130,6 +130,7 @@ export const FONT_OPTIONS = [
   'Libre Baskerville', 'EB Garamond', 'Cormorant Garamond', 'Crimson Pro', 'Playfair Display',
   'Cinzel', 'IM Fell English', 'Uncial Antiqua', 'Pirata One', 'Special Elite', 'Courier Prime',
   'Orbitron', 'Press Start 2P', 'Bebas Neue', 'Creepster', 'Caveat', 'Dancing Script',
+  'Fredoka', 'Bangers', 'Comic Neue', 'Patrick Hand', 'Kalam', 'Righteous',
 ];
 
 export const fontStack = (f: string) =>
