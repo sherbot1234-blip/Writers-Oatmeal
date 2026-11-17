@@ -29,6 +29,9 @@ You'll use **Supabase**, a free online database. The free plan is plenty for one
 
 ## 4. Connect the website
 
+> ✅ **Done:** this project's address and publishable key are already built into the site (`src/config.ts`). Just sign in.
+
+
 1. In the left sidebar, click **Project Settings** (the cog) → **API Keys** (or **Data API**).
 2. Copy two things:
    - **Project URL**, which looks like `https://abcdefgh.supabase.co`

@@ -1,18 +1,22 @@
 import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
+export const THEME_BASE = { card: 'soft', texture: 'none', ornament: '', headingCase: 'normal', mood: 'main', mainName: 'Light', altName: 'Dark' } as const;
+
+const preset = (name: string, t: Omit<Theme, keyof typeof THEME_BASE>) => ({ name, theme: { ...THEME_BASE, ...t } as Theme });
+
 export const THEME_PRESETS: { name: string; theme: Theme }[] = [
-  { name: 'Parchment', theme: { bg: '#f4ecd8', surface: '#fbf6e9', text: '#3b2f22', muted: '#8a7558', accent: '#8b3a1a', headingFont: 'IM Fell English', bodyFont: 'EB Garamond', radius: 6, bgOverlay: 85 } },
-  { name: 'Midnight', theme: { bg: '#0f1222', surface: '#181c33', text: '#e6e8f5', muted: '#8c91b5', accent: '#8fa8ff', headingFont: 'Cinzel', bodyFont: 'Inter', radius: 12, bgOverlay: 80 } },
-  { name: 'Neon City', theme: { bg: '#0b0b10', surface: '#15151f', text: '#f0f0ff', muted: '#8a8aa8', accent: '#ff2e88', headingFont: 'Orbitron', bodyFont: 'Space Grotesk', radius: 2, bgOverlay: 80 } },
-  { name: 'Enchanted Forest', theme: { bg: '#1b2a1f', surface: '#233628', text: '#e7efe0', muted: '#9db39a', accent: '#c9a74a', headingFont: 'Uncial Antiqua', bodyFont: 'Lora', radius: 14, bgOverlay: 80 } },
-  { name: 'Rose Garden', theme: { bg: '#fdf0f2', surface: '#ffffff', text: '#4a2a33', muted: '#a07583', accent: '#d0567a', headingFont: 'Dancing Script', bodyFont: 'Quicksand', radius: 20, bgOverlay: 85 } },
-  { name: 'Ocean', theme: { bg: '#e8f3f6', surface: '#ffffff', text: '#13323d', muted: '#5c7f8a', accent: '#1f8a9e', headingFont: 'Josefin Sans', bodyFont: 'Nunito', radius: 14, bgOverlay: 85 } },
-  { name: 'Noir', theme: { bg: '#e9e7e3', surface: '#f7f6f3', text: '#111111', muted: '#666666', accent: '#9b1c1c', headingFont: 'Special Elite', bodyFont: 'Courier Prime', radius: 0, bgOverlay: 85 } },
-  { name: 'Horror', theme: { bg: '#120a0a', surface: '#1d1111', text: '#eadede', muted: '#9a7f7f', accent: '#c1121f', headingFont: 'Creepster', bodyFont: 'Crimson Pro', radius: 4, bgOverlay: 80 } },
-  { name: 'Pirate', theme: { bg: '#2b2118', surface: '#3a2d21', text: '#f3e6cf', muted: '#bfa27a', accent: '#e0a83a', headingFont: 'Pirata One', bodyFont: 'Libre Baskerville', radius: 6, bgOverlay: 80 } },
-  { name: 'Pixel', theme: { bg: '#1d1f3a', surface: '#2a2d55', text: '#f2f2ff', muted: '#a0a3d0', accent: '#ffcc00', headingFont: 'Press Start 2P', bodyFont: 'Nunito', radius: 0, bgOverlay: 80 } },
-  { name: 'Minimal', theme: { bg: '#fafafa', surface: '#ffffff', text: '#1a1a1a', muted: '#777777', accent: '#3b5bdb', headingFont: 'Inter', bodyFont: 'Inter', radius: 10, bgOverlay: 85 } },
+  preset('Parchment', { bg: '#f4ecd8', surface: '#fbf6e9', text: '#3b2f22', muted: '#8a7558', accent: '#8b3a1a', headingFont: 'IM Fell English', bodyFont: 'EB Garamond', radius: 6, bgOverlay: 85 }),
+  preset('Midnight', { bg: '#0f1222', surface: '#181c33', text: '#e6e8f5', muted: '#8c91b5', accent: '#8fa8ff', headingFont: 'Cinzel', bodyFont: 'Inter', radius: 12, bgOverlay: 80 }),
+  preset('Neon City', { bg: '#0b0b10', surface: '#15151f', text: '#f0f0ff', muted: '#8a8aa8', accent: '#ff2e88', headingFont: 'Orbitron', bodyFont: 'Space Grotesk', radius: 2, bgOverlay: 80 }),
+  preset('Enchanted Forest', { bg: '#1b2a1f', surface: '#233628', text: '#e7efe0', muted: '#9db39a', accent: '#c9a74a', headingFont: 'Uncial Antiqua', bodyFont: 'Lora', radius: 14, bgOverlay: 80 }),
+  preset('Rose Garden', { bg: '#fdf0f2', surface: '#ffffff', text: '#4a2a33', muted: '#a07583', accent: '#d0567a', headingFont: 'Dancing Script', bodyFont: 'Quicksand', radius: 20, bgOverlay: 85 }),
+  preset('Ocean', { bg: '#e8f3f6', surface: '#ffffff', text: '#13323d', muted: '#5c7f8a', accent: '#1f8a9e', headingFont: 'Josefin Sans', bodyFont: 'Nunito', radius: 14, bgOverlay: 85 }),
+  preset('Noir', { bg: '#e9e7e3', surface: '#f7f6f3', text: '#111111', muted: '#666666', accent: '#9b1c1c', headingFont: 'Special Elite', bodyFont: 'Courier Prime', radius: 0, bgOverlay: 85 }),
+  preset('Horror', { bg: '#120a0a', surface: '#1d1111', text: '#eadede', muted: '#9a7f7f', accent: '#c1121f', headingFont: 'Creepster', bodyFont: 'Crimson Pro', radius: 4, bgOverlay: 80 }),
+  preset('Pirate', { bg: '#2b2118', surface: '#3a2d21', text: '#f3e6cf', muted: '#bfa27a', accent: '#e0a83a', headingFont: 'Pirata One', bodyFont: 'Libre Baskerville', radius: 6, bgOverlay: 80 }),
+  preset('Pixel', { bg: '#1d1f3a', surface: '#2a2d55', text: '#f2f2ff', muted: '#a0a3d0', accent: '#ffcc00', headingFont: 'Press Start 2P', bodyFont: 'Nunito', radius: 0, bgOverlay: 80 }),
+  preset('Minimal', { bg: '#fafafa', surface: '#ffffff', text: '#1a1a1a', muted: '#777777', accent: '#3b5bdb', headingFont: 'Inter', bodyFont: 'Inter', radius: 10, bgOverlay: 85 }),
 ];
 
 export const DEFAULT_TABS: TabConfig[] = [
@@ -170,6 +174,8 @@ export function defaultQuestions(): Question[] {
   ];
 }
 
+export const DEFAULT_LORE_CATEGORIES = ['Places', 'Factions', 'Creatures', 'Items', 'Magic & Tech', 'Culture'];
+
 export const defaultMoments = (): Moment[] => ['Beginning', 'Middle', 'End'].map((label) => ({ id: uid(), label }));
 
 export const defaultMeters = (): MeterDef[] => [
@@ -230,6 +236,7 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     genres: [],
     theme: theme ? { ...theme } : { ...THEME_PRESETS[0].theme },
     tabs: DEFAULT_TABS.map((t) => ({ ...t })),
+    customPages: [],
     playlistUrl: '',
     links: [],
     songs: [],
@@ -243,6 +250,10 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     arcs: defaultArcs(),
     worldImages: [],
     questions: defaultQuestions(),
+    lore: [],
+    loreCategories: [...DEFAULT_LORE_CATEGORIES],
+    events: [],
+    glossary: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -252,7 +263,7 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
 export function normalizeStory(raw: Partial<Story>): Story {
   const base = makeStory();
   const s = { ...base, ...raw } as Story;
-  s.theme = { ...base.theme, ...(raw.theme ?? {}) };
+  s.theme = { ...THEME_BASE, ...base.theme, ...(raw.theme ?? {}) } as Theme;
   const tabs = Array.isArray(raw.tabs) ? raw.tabs : [];
   // keep the user's tab order, slotting any new pages in after the page they normally follow
   s.tabs = tabs.filter((t) => DEFAULT_TABS.some((d) => d.key === t.key)).map((t) => ({ ...t }));
@@ -264,7 +275,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (s.kind !== 'universe') s.kind = 'story';
   if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
   if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
-  for (const k of ['sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  for (const k of ['customPages', 'lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();

@@ -105,7 +105,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const replace = useCallback((l: Library) => setLib((prev) => (prev ? stamp(prev, l) : l)), []);
   const applyRemote = useCallback((fn: (l: Library) => Library) => setLib((prev) => (prev ? fn(prev) : prev)), []);
 
-  if (!lib) return <div className="loading">Loading your stories…</div>;
+  if (!lib)
+    return (
+      <div className="loading">
+        <span className="loading-bowl">🥣</span>
+        <p>Stirring your oatmeal…</p>
+      </div>
+    );
   return <LibraryContext.Provider value={{ lib, update, replace, applyRemote, saveState, saveNow: flush }}>{children}</LibraryContext.Provider>;
 }
 

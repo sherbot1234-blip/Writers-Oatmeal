@@ -1,4 +1,30 @@
+export type CardStyle = 'soft' | 'flat' | 'outlined' | 'paper' | 'pixel' | 'folder' | 'glass' | 'comic';
+export type Texture = 'none' | 'paper' | 'noise' | 'lined' | 'grid' | 'scanlines' | 'dots' | 'stars';
+export type HeadingCase = 'normal' | 'upper' | 'small-caps';
+
+export interface Palette {
+  bg: string;
+  surface: string;
+  text: string;
+  muted: string;
+  accent: string;
+}
+
 export interface Theme {
+  /** the style pack this look started from */
+  pack?: string;
+  card: CardStyle;
+  texture: Texture;
+  /** little decoration under page titles, e.g. ❦ or ▸▸▸ */
+  ornament: string;
+  headingCase: HeadingCase;
+  /** wide image across the top of every page */
+  banner?: string;
+  /** an optional second colour scheme the story can flip to (e.g. whimsical ↔ dark) */
+  alt?: Palette;
+  mood: 'main' | 'alt';
+  mainName: string;
+  altName: string;
   bg: string;
   surface: string;
   text: string;
@@ -10,6 +36,15 @@ export interface Theme {
   bgImage?: string;
   /** 0–100: how strongly the background colour covers the background image */
   bgOverlay: number;
+}
+
+/** A page you design yourself out of sections (Magic system, Case board, Levels…). */
+export interface CustomPage {
+  id: string;
+  title: string;
+  icon: string;
+  hidden: boolean;
+  sections: Section[];
 }
 
 export type TabKey = 'overview' | 'songs' | 'characters' | 'relationships' | 'plot' | 'chapters' | 'world';
@@ -212,6 +247,51 @@ export interface WorldImage {
   title: string;
   caption: string;
   src: string;
+  /** clickable markers on a map, positioned in % of the image */
+  pins?: Pin[];
+}
+
+export interface Pin {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  note: string;
+  /** wiki page this pin points to */
+  entryId?: string;
+}
+
+/** A wiki page: a place, faction, creature, item, magic system… */
+export interface LoreEntry {
+  id: string;
+  category: string;
+  name: string;
+  image?: string;
+  summary: string;
+  body: string;
+  facts: Fact[];
+  characterIds: string[];
+  /** other wiki pages this one is connected to */
+  entryIds: string[];
+}
+
+export interface WorldEvent {
+  id: string;
+  /** free text: "Year 312", "Before the Fall", "Season 2, week 4" */
+  when: string;
+  /** optional number used to sort events */
+  year?: number;
+  title: string;
+  description: string;
+  characterIds: string[];
+}
+
+export interface GlossaryTerm {
+  id: string;
+  term: string;
+  pronunciation: string;
+  category: string;
+  definition: string;
 }
 
 export interface Question {
@@ -245,6 +325,7 @@ export interface Story {
   cover?: string;
   theme: Theme;
   tabs: TabConfig[];
+  customPages: CustomPage[];
   playlistUrl: string;
   links: LinkItem[];
   songs: Song[];
@@ -260,6 +341,10 @@ export interface Story {
   structure?: Structure;
   worldImages: WorldImage[];
   questions: Question[];
+  lore: LoreEntry[];
+  loreCategories: string[];
+  events: WorldEvent[];
+  glossary: GlossaryTerm[];
   createdAt: number;
   updatedAt: number;
 }

@@ -7,18 +7,26 @@ import { Field, Modal } from '../components/ui';
 import type { Story, StoryStatus, Theme } from '../types';
 import { pathFor } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
+import { OatLogo } from '../components/Logo';
+
+/** The colours in use right now: the main palette, or the second mood if it's switched on. */
+export function palette(t: Theme) {
+  return t.mood === 'alt' && t.alt ? t.alt : { bg: t.bg, surface: t.surface, text: t.text, muted: t.muted, accent: t.accent };
+}
 
 export function themeVars(t: Theme): React.CSSProperties {
+  const p = palette(t);
   return {
-    ['--bg' as any]: t.bg,
-    ['--surface' as any]: t.surface,
-    ['--text' as any]: t.text,
-    ['--muted' as any]: t.muted,
-    ['--accent' as any]: t.accent,
+    ['--bg' as any]: p.bg,
+    ['--surface' as any]: p.surface,
+    ['--text' as any]: p.text,
+    ['--muted' as any]: p.muted,
+    ['--accent' as any]: p.accent,
+    ['--ornament' as any]: JSON.stringify(t.ornament || ''),
     ['--radius' as any]: t.radius + 'px',
     ['--font-head' as any]: fontStack(t.headingFont),
     ['--font-body' as any]: fontStack(t.bodyFont),
-    ['--on-accent' as any]: readableOn(t.accent),
+    ['--on-accent' as any]: readableOn(p.accent),
   };
 }
 
@@ -171,12 +179,15 @@ export default function LibraryPage() {
   return (
     <div className="library">
       <header className="lib-head">
-        <div>
+        <div className="lib-brand">
+          <OatLogo size={68} />
+          <div>
           <Field className="lib-title" value={lib.siteTitle} onChange={(v) => update((d) => void (d.siteTitle = v))} />
           <p className="muted">
             {total} {total === 1 ? 'story' : 'stories'}
             {lib.universes.length > 0 && ` · ${lib.universes.length} ${lib.universes.length === 1 ? 'universe' : 'universes'}`} · <SaveBadge state={saveState} />
           </p>
+          </div>
         </div>
         <div className="row gap wrap">
           <CloudButton />
@@ -192,7 +203,7 @@ export default function LibraryPage() {
       {total === 0 && lib.universes.length === 0 ? (
         <div className="lib-empty">
           <div className="empty-shelf" aria-hidden>
-            <span>📕</span><span>📗</span><span>📘</span>
+            <OatLogo size={110} />
           </div>
           <h2>Your shelf is empty</h2>
           <p className="muted">Create your first story. Each one gets its own look, characters, plot, world and soundtrack.<br />Stories that share a world can live together in a universe.</p>

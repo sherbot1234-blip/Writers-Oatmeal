@@ -13,6 +13,7 @@ import Relationships from './pages/Relationships';
 import Plot from './pages/Plot';
 import World from './pages/World';
 import Chapters from './pages/Chapters';
+import CustomPageView from './pages/CustomPageView';
 // the editor is big, so it only loads when you open a chapter
 const ChapterEditor = lazy(() => import('./pages/ChapterEditor'));
 const editorPage = (
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="chapters" element={<Chapters />} />
             <Route path="chapters/:chapterId" element={editorPage} />
             <Route path="settings" element={<Settings />} />
+            <Route path="p/:pageId" element={<CustomPageView />} />
           </Route>
           <Route path="/universe/:storyId" element={<StoryLayout />}>
             <Route index element={<Overview />} />
@@ -56,6 +58,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="chapters" element={<Chapters />} />
             <Route path="chapters/:chapterId" element={editorPage} />
             <Route path="settings" element={<Settings />} />
+            <Route path="p/:pageId" element={<CustomPageView />} />
           </Route>
           <Route path="*" element={<LibraryPage />} />
         </Routes>

@@ -13,7 +13,7 @@ import type { Chapter, ChapterStatus, Character, Story } from '../types';
 type Panel = 'notes' | 'cast' | 'plot' | 'world' | 'music';
 
 export default function ChapterEditor() {
-  const { story, upd, base } = useStoryCtx();
+  const { story, upd, base, universe } = useStoryCtx();
   const { chapterId } = useParams();
   const { chapters, edit } = useChapters(story.id);
   const idx = chapters.findIndex((c) => c.id === chapterId);
@@ -153,7 +153,7 @@ export default function ChapterEditor() {
               )}
               {panel === 'cast' && <CastPanel story={story} povId={ch.povId} />}
               {panel === 'plot' && <PlotPanel story={story} chapterId={ch.id} upd={upd} base={base} />}
-              {panel === 'world' && <WorldPanel story={story} />}
+              {panel === 'world' && <WorldPanel story={story} universe={universe} />}
               {panel === 'music' && <MusicPanel story={story} chapterId={ch.id} upd={upd} povId={ch.povId} />}
             </div>
           </aside>
@@ -335,28 +335,60 @@ function PlotPanel({ story, chapterId, upd, base }: { story: Story; chapterId: s
   );
 }
 
-function WorldPanel({ story }: { story: Story }) {
-  const [zoom, setZoom] = useState<number | null>(null);
+function WorldPanel({ story, universe }: { story: Story; universe?: Story }) {
+  const [zoom, setZoom] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const answered = story.questions.filter((x) => x.answer.trim() && (!q || (x.question + x.answer).toLowerCase().includes(q.toLowerCase())));
+  const [open, setOpen] = useState<string | null>(null);
+  const worlds = [story, ...(universe ? [universe] : [])];
+  const has = (...xs: string[]) => !q || xs.some((x) => x.toLowerCase().includes(q.toLowerCase()));
+  const images = worlds.flatMap((w) => w.worldImages);
+  const lore = worlds.flatMap((w) => w.lore).filter((e) => has(e.name, e.summary, e.body, e.category));
+  const terms = worlds.flatMap((w) => w.glossary).filter((t) => t.term && has(t.term, t.definition));
+  const answered = worlds.flatMap((w) => w.questions).filter((x) => x.answer.trim() && has(x.question, x.answer));
+  const zoomed = images.find((i) => i.id === zoom);
   return (
     <>
-      {story.worldImages.length > 0 && (
+      <input className="input slim" style={{ width: '100%', marginBottom: 8 }} placeholder="Search places, lore, words…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {images.length > 0 && !q && (
         <div className="side-gallery">
-          {story.worldImages.map((img, i) => (
-            <img key={img.id} src={img.src} alt={img.title} title={img.title} onClick={() => setZoom(i)} />
+          {images.map((img) => (
+            <img key={img.id} src={img.src} alt={img.title} title={img.title} onClick={() => setZoom(img.id)} />
           ))}
         </div>
       )}
-      <input className="input slim" style={{ width: '100%', margin: '8px 0' }} placeholder="Search world notes…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {lore.length > 0 && <label className="lbl">Wiki</label>}
+      {lore.map((e) => (
+        <div key={e.id} className="world-note small">
+          <button className="link-btn" onClick={() => setOpen(open === e.id ? null : e.id)}>
+            <b>{e.name || 'Untitled'}</b> <span className="muted">· {e.category}</span>
+          </button>
+          {e.summary && <p>{e.summary}</p>}
+          {open === e.id && (
+            <>
+              {e.facts.filter((f) => f.value).map((f) => (
+                <div key={f.id}><span className="muted">{f.label}:</span> {f.value}</div>
+              ))}
+              {e.body && <p>{e.body}</p>}
+            </>
+          )}
+        </div>
+      ))}
+      {terms.length > 0 && <label className="lbl">Glossary</label>}
+      {terms.map((t) => (
+        <div key={t.id} className="world-note small">
+          <b>{t.term}</b> {t.pronunciation && <span className="muted">{t.pronunciation}</span>}
+          <p>{t.definition}</p>
+        </div>
+      ))}
+      {answered.length > 0 && <label className="lbl">World questions</label>}
       {answered.map((x) => (
         <div key={x.id} className="world-note small">
           <b>{x.question}</b>
           <p>{x.answer}</p>
         </div>
       ))}
-      {!answered.length && <p className="muted small">Answers from the World page show up here.</p>}
-      {zoom !== null && <Lightbox src={story.worldImages[zoom].src} caption={story.worldImages[zoom].title} onClose={() => setZoom(null)} />}
+      {!lore.length && !terms.length && !answered.length && <p className="muted small">{q ? 'Nothing matches.' : 'Wiki pages, glossary terms and world answers show up here.'}</p>}
+      {zoomed && <Lightbox src={zoomed.src} caption={zoomed.title} onClose={() => setZoom(null)} />}
     </>
   );
 }
