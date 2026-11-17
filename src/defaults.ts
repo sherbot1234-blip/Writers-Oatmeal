@@ -170,6 +170,8 @@ export function defaultQuestions(): Question[] {
   ];
 }
 
+export const DEFAULT_LORE_CATEGORIES = ['Places', 'Factions', 'Creatures', 'Items', 'Magic & Tech', 'Culture'];
+
 export const defaultMoments = (): Moment[] => ['Beginning', 'Middle', 'End'].map((label) => ({ id: uid(), label }));
 
 export const defaultMeters = (): MeterDef[] => [
@@ -243,6 +245,10 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     arcs: defaultArcs(),
     worldImages: [],
     questions: defaultQuestions(),
+    lore: [],
+    loreCategories: [...DEFAULT_LORE_CATEGORIES],
+    events: [],
+    glossary: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -264,7 +270,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (s.kind !== 'universe') s.kind = 'story';
   if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
   if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
-  for (const k of ['sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  for (const k of ['lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();

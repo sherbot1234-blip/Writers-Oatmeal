@@ -212,6 +212,51 @@ export interface WorldImage {
   title: string;
   caption: string;
   src: string;
+  /** clickable markers on a map, positioned in % of the image */
+  pins?: Pin[];
+}
+
+export interface Pin {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  note: string;
+  /** wiki page this pin points to */
+  entryId?: string;
+}
+
+/** A wiki page: a place, faction, creature, item, magic system… */
+export interface LoreEntry {
+  id: string;
+  category: string;
+  name: string;
+  image?: string;
+  summary: string;
+  body: string;
+  facts: Fact[];
+  characterIds: string[];
+  /** other wiki pages this one is connected to */
+  entryIds: string[];
+}
+
+export interface WorldEvent {
+  id: string;
+  /** free text: "Year 312", "Before the Fall", "Season 2, week 4" */
+  when: string;
+  /** optional number used to sort events */
+  year?: number;
+  title: string;
+  description: string;
+  characterIds: string[];
+}
+
+export interface GlossaryTerm {
+  id: string;
+  term: string;
+  pronunciation: string;
+  category: string;
+  definition: string;
 }
 
 export interface Question {
@@ -260,6 +305,10 @@ export interface Story {
   structure?: Structure;
   worldImages: WorldImage[];
   questions: Question[];
+  lore: LoreEntry[];
+  loreCategories: string[];
+  events: WorldEvent[];
+  glossary: GlossaryTerm[];
   createdAt: number;
   updatedAt: number;
 }

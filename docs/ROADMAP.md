@@ -27,13 +27,14 @@ Each story looks completely different from the others. **Milanote** stays my mai
 - [x] Writing: chapters with a formatting editor, word counts, POV and status, notes on passages, a side panel (cast, plot, world), focus mode, manuscript download
 - [x] Plot: timeline (arcs × chapters, drag and drop), structure templates (Three-Act, Save the Cat, Hero's Journey, Kishōtenketsu, custom), plot points linked to chapters
 - [x] Music: theme songs on character cards, songs linked to chapters & scenes, soundtrack by chapter, 🎵 tab while writing, Spotify playlist import (PKCE sign-in, no server)
+- [x] World: wiki pages (custom categories, facts, related pages, backlinks), clickable map pins linked to pages, world history timeline, glossary, all shareable at universe level and searchable while writing
 - [x] Universes / series: series order, shared characters (edit once, shows in every story), universe-level world, songs and relationships
 
 ## Next, in order
 
-1. *(done)* Still to come for universes: shared **places** (arrives with the world wiki in step 5).
+1. *(done)* Universes, including shared places (via the universe's world wiki).
 2. *(done)* Characters & relationships.
 3. *(done)* Writing & plot.
 4. *(done)* Music.
-5. **World**: interactive maps with pins, wiki-style lore pages (places, factions, items, creatures, magic systems), world history timeline, glossary.
+5. *(done)* World.
 6. **Style packs & custom pages**: full style packs (layout, borders, ornaments, textures, header banners) with per-part overrides; add custom pages per story; a more whimsical default look for the whole site.
