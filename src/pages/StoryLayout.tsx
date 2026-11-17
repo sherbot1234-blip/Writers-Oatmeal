@@ -11,6 +11,7 @@ const TAB_ICONS: Record<TabKey, string> = {
   overview: '📖',
   characters: '👤',
   relationships: '💞',
+  trees: '🌳',
   plot: '🧵',
   chapters: '✍️',
   world: '🗺️',
@@ -67,6 +68,11 @@ export default function StoryLayout() {
           {story.title || 'Untitled'}
         </Link>
         <span className="muted small save"><SaveBadge state={saveState} /></span>
+        {(story.milanoteUrl || universe?.milanoteUrl) && (
+          <a className="mood-btn" href={story.milanoteUrl || universe!.milanoteUrl} target="_blank" rel="noreferrer" title="Open the Milanote board">
+            📌 <span className="mood-label">Board</span>
+          </a>
+        )}
         {t.alt && (
           <button
             className="mood-btn"

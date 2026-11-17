@@ -47,7 +47,7 @@ export interface CustomPage {
   sections: Section[];
 }
 
-export type TabKey = 'overview' | 'songs' | 'characters' | 'relationships' | 'plot' | 'chapters' | 'world';
+export type TabKey = 'overview' | 'songs' | 'characters' | 'relationships' | 'trees' | 'plot' | 'chapters' | 'world';
 
 export interface TabConfig {
   key: TabKey;
@@ -175,6 +175,54 @@ export interface Relationship {
   to: string;
   notes: string;
   states: Record<string, RelState>;
+  /** One record covers both people (A ↔ B). When false, it's only how `from` sees `to`. */
+  mutual?: boolean;
+}
+
+/** A group of characters within a story: Humans, Dragons, The Ancients… */
+export interface CharCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export type LineStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+
+/** A kind of line in a hand-made family tree. */
+export interface TreeLineType {
+  id: string;
+  label: string;
+  color: string;
+  style: LineStyle;
+  /** 'down' lines run from an older generation to a younger one with a family-tree elbow */
+  shape: 'down' | 'straight';
+}
+
+export interface TreeNode {
+  id: string;
+  /** a character from the story… */
+  charId?: string;
+  /** …or just a name */
+  name?: string;
+  note: string;
+  x: number;
+  y: number;
+}
+
+export interface TreeLink {
+  id: string;
+  from: string;
+  to: string;
+  typeId: string;
+  label: string;
+}
+
+export interface FamilyTree {
+  id: string;
+  name: string;
+  nodes: TreeNode[];
+  links: TreeLink[];
 }
 
 export type PlotStatus = 'idea' | 'planned' | 'written';
@@ -333,6 +381,13 @@ export interface Story {
   characterTemplate: Section[];
   relTypes: RelType[];
   relationships: Relationship[];
+  charCategories: CharCategory[];
+  /** character id → category ids (kept on the story so shared universe characters can be grouped differently per book) */
+  charCategoryMap: Record<string, string[]>;
+  trees: FamilyTree[];
+  treeLineTypes: TreeLineType[];
+  /** the story's main Milanote board */
+  milanoteUrl: string;
   moments: Moment[];
   relMeters: MeterDef[];
   /** character id → their arc in this story */
