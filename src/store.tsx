@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { produce, type Draft } from 'immer';
-import { get, set } from 'idb-keyval';
+import { getMany, setMany } from 'idb-keyval';
 import type { Library, Story } from './types';
 import { emptyLibrary, normalizeLibrary } from './defaults';
 import { docId } from './sync/engine';
@@ -54,30 +54,80 @@ function stamp(prev: Library, next: Library): Library {
   });
 }
 
+const KEY_AT = KEY + ':savedAt';
+const UNSAVED = 'wo-unsaved-changes';
+
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const [lib, setLib] = useState<Library | null>(null);
   const [saveState, setSaveState] = useState<Ctx['saveState']>('saved');
   const timer = useRef<number>();
+  const lastWrite = useRef(0);
   const latest = useRef<Library | null>(null);
+  /** the version waiting to be written (null = everything is safely stored) */
+  const dirty = useRef<Library | null>(null);
 
   useEffect(() => {
-    get(KEY)
-      .then((v) => setLib(normalizeLibrary(v) ?? emptyLibrary()))
-      .catch(() => setLib(emptyLibrary()));
+    (async () => {
+      let stored: Library | null = null;
+      let storedAt = 0;
+      try {
+        const [v, at] = await getMany([KEY, KEY_AT]);
+        stored = normalizeLibrary(v);
+        storedAt = typeof at === 'number' ? at : 0;
+      } catch {
+        /* fall through to an empty library */
+      }
+      // changes made just before the page closed last time, if they never reached main storage
+      let rescued: Library | null = null;
+      try {
+        const raw = localStorage.getItem(UNSAVED);
+        if (raw) {
+          const u = JSON.parse(raw) as { at: number; lib: unknown };
+          if (u.at > storedAt) rescued = normalizeLibrary(u.lib);
+        }
+        localStorage.removeItem(UNSAVED);
+      } catch {
+        /* ignore */
+      }
+      if (rescued) {
+        // write them properly now
+        latest.current = null;
+        setLib(rescued);
+        setMany([[KEY, rescued], [KEY_AT, Date.now()]]).catch(() => {});
+      } else setLib(stored ?? emptyLibrary());
+    })();
     // Ask the browser not to evict our data under storage pressure.
     navigator.storage?.persist?.().catch(() => {});
   }, []);
 
   const flush = useCallback(async () => {
-    if (!latest.current) return;
+    const snapshot = latest.current;
+    if (!snapshot) return;
     clearTimeout(timer.current);
+    lastWrite.current = Date.now();
     try {
-      await set(KEY, latest.current);
-      setSaveState('saved');
+      await setMany([[KEY, snapshot], [KEY_AT, Date.now()]]);
+      if (dirty.current === snapshot) dirty.current = null;
+      setSaveState(dirty.current ? 'saving' : 'saved');
     } catch {
       setSaveState('error');
     }
   }, []);
+
+  /**
+   * Leaving the page (or switching away) while a save is still on its way: the
+   * browser may stop that save, so also park the latest changes somewhere that
+   * saves instantly. The next visit picks them up if they're newer.
+   */
+  const rescue = useCallback(() => {
+    if (!dirty.current) return;
+    try {
+      localStorage.setItem(UNSAVED, JSON.stringify({ at: Date.now(), lib: dirty.current }));
+    } catch {
+      /* too big for this storage: the normal save below is all we can do */
+    }
+    flush();
+  }, [flush]);
 
   useEffect(() => {
     if (!lib) return;
@@ -86,20 +136,27 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       return;
     }
     latest.current = lib;
+    dirty.current = lib;
     setSaveState('saving');
+    // Save straight away after a single change; while you're typing quickly,
+    // save at most every 0.4 s.
     clearTimeout(timer.current);
-    timer.current = window.setTimeout(flush, 400);
+    const since = Date.now() - lastWrite.current;
+    if (since >= 400) flush();
+    else timer.current = window.setTimeout(flush, 400 - since);
   }, [lib, flush]);
 
   useEffect(() => {
-    const onHide = () => document.visibilityState === 'hidden' && flush();
+    const onHide = () => document.visibilityState === 'hidden' && rescue();
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flush);
+    window.addEventListener('pagehide', rescue);
+    window.addEventListener('beforeunload', rescue);
     return () => {
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pagehide', rescue);
+      window.removeEventListener('beforeunload', rescue);
     };
-  }, [flush]);
+  }, [rescue]);
 
   const update = useCallback((fn: LibUpdater) => setLib((prev) => (prev ? stamp(prev, produce(prev, fn)) : prev)), []);
   const replace = useCallback((l: Library) => setLib((prev) => (prev ? stamp(prev, l) : l)), []);

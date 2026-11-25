@@ -1,3 +1,15 @@
+/**
+ * How a picture sits in its frame. It never changes the picture itself.
+ * x / y: which point of the picture is centred (0–1); zoom ≥ 1;
+ * fit: fill the frame (cropping edges) or show the whole picture.
+ */
+export interface Frame {
+  x: number;
+  y: number;
+  zoom: number;
+  fit: 'cover' | 'contain';
+}
+
 export type CardStyle = 'soft' | 'flat' | 'outlined' | 'paper' | 'pixel' | 'folder' | 'glass' | 'comic';
 export type Texture = 'none' | 'paper' | 'noise' | 'lined' | 'grid' | 'scanlines' | 'dots' | 'stars';
 export type HeadingCase = 'normal' | 'upper' | 'small-caps';
@@ -20,6 +32,7 @@ export interface Theme {
   headingCase: HeadingCase;
   /** wide image across the top of every page */
   banner?: string;
+  bannerFrame?: Frame;
   /** an optional second colour scheme the story can flip to (e.g. whimsical ↔ dark) */
   alt?: Palette;
   mood: 'main' | 'alt';
@@ -100,6 +113,8 @@ export interface Section {
   statsView?: 'radar' | 'bars';
   tags?: string[];
   images?: string[];
+  /** framing for each picture in `images`, same order */
+  imageFrames?: (Frame | null)[];
   quotes?: Quote[];
   /** speech patterns, accent, verbal tics (quotes sections) */
   voice?: string;
@@ -116,6 +131,7 @@ export interface Character {
   name: string;
   role: string;
   image?: string;
+  imageFrame?: Frame;
   color: string;
   sections: Section[];
   links?: LinkItem[];
@@ -127,6 +143,7 @@ export interface Era {
   id: string;
   name: string;
   image?: string;
+  frame?: Frame;
   description: string;
 }
 
@@ -295,6 +312,7 @@ export interface WorldImage {
   title: string;
   caption: string;
   src: string;
+  frame?: Frame;
   /** clickable markers on a map, positioned in % of the image */
   pins?: Pin[];
 }
@@ -315,6 +333,7 @@ export interface LoreEntry {
   category: string;
   name: string;
   image?: string;
+  imageFrame?: Frame;
   summary: string;
   body: string;
   facts: Fact[];
@@ -371,6 +390,7 @@ export interface Story {
   synopsis: string;
   genres: string[];
   cover?: string;
+  coverFrame?: Frame;
   theme: Theme;
   tabs: TabConfig[];
   customPages: CustomPage[];

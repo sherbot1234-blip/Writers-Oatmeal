@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { pathFor, useStoryCtx } from '../storyContext';
 import { useLibrary } from '../store';
 import { deleteUniverseCharacter, shareCharacter, storiesUsing } from '../universe';
-import { Avatar, ColorPick, Field, ImagePick, Lightbox } from '../components/ui';
+import { Avatar, ColorPick, DropZone, Field, ImagePick, Lightbox } from '../components/ui';
+import { AdjustButton, FramedImg } from '../components/Framed';
 import { SectionList } from '../components/Sections';
 import { Links } from '../components/Links';
 import { AddSong, MiniSongs } from '../components/Music';
@@ -85,15 +86,39 @@ export default function CharacterDetail() {
       )}
 
       <div className="char-hero card" style={{ borderColor: c.color }}>
-        <div className="char-portrait" style={{ borderColor: c.color }}>
-          {shownImage ? <img src={shownImage} alt="" onClick={() => setZoom(true)} /> : <Avatar c={c} size={140} />}
-          {!era && <div className="char-portrait-actions">
-            <ImagePick className="btn small" maxDim={1000} onPick={([src]) => edit((ch) => void (ch.image = src))}>
-              {c.image ? 'Change' : 'Add picture'}
-            </ImagePick>
-            {c.image && <button className="btn small ghost" onClick={() => edit((ch) => void (ch.image = undefined))}>Remove</button>}
-          </div>}
-        </div>
+        <DropZone
+          className="char-portrait"
+          style={{ borderColor: c.color }}
+          label={era ? `Drop a picture for “${era.name || 'this look'}”` : 'Drop a picture'}
+          onPick={([src]) =>
+            edit((ch) => {
+              // dropping while a look is selected sets that look's picture
+              const e = era && ch.eras?.find((x) => x.id === era.id);
+              if (e) {
+                e.image = src;
+                e.frame = undefined;
+              } else {
+                ch.image = src;
+                ch.imageFrame = undefined;
+              }
+            })
+          }
+        >
+          {shownImage ? (
+            <FramedImg src={shownImage} frame={era ? era.frame : c.imageFrame} className="fill zoomable" onClick={() => setZoom(true)} />
+          ) : (
+            <Avatar c={c} size={140} />
+          )}
+          {!era && (
+            <div className="char-portrait-actions">
+              <ImagePick className="btn small" maxDim={1000} onPick={([src]) => edit((ch) => { ch.image = src; ch.imageFrame = undefined; })}>
+                {c.image ? 'Change' : 'Add picture'}
+              </ImagePick>
+              {c.image && <AdjustButton src={c.image} frame={c.imageFrame} aspect={1} round onSave={(f) => edit((ch) => void (ch.imageFrame = f))} />}
+              {c.image && <button className="btn small ghost" onClick={() => edit((ch) => { ch.image = undefined; ch.imageFrame = undefined; })}>Remove</button>}
+            </div>
+          )}
+        </DropZone>
         <div className="char-hero-text">
           <Field className="h-title" value={c.name} placeholder="Character name" onChange={(v) => edit((ch) => void (ch.name = v))} />
           <Field className="h-tagline" value={c.role} placeholder="Role — protagonist, the mentor, comic relief…" onChange={(v) => edit((ch) => void (ch.role = v))} />
@@ -231,10 +256,13 @@ export default function CharacterDetail() {
           <div className="era-grid">
             {eras.map((e, i) => (
               <div key={e.id} className={'era-card' + (era?.id === e.id ? ' on' : '')} onClick={() => setEraId(e.id)} style={{ ['--cc' as any]: c.color }}>
-                <div className="era-img" style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
-                  {!e.image && <span className="muted small">No picture</span>}
-                  <ImagePick className="btn small era-pick" maxDim={1000} onPick={([src]) => edit((ch) => void (ch.eras![i].image = src))}>{e.image ? '↻' : '+ Picture'}</ImagePick>
-                </div>
+                <DropZone className="era-img" onPick={([src]) => edit((ch) => { ch.eras![i].image = src; ch.eras![i].frame = undefined; })}>
+                  {e.image ? <FramedImg src={e.image} frame={e.frame} className="fill" /> : <span className="muted small">No picture<br />drag one here</span>}
+                  <span className="era-pick row gap">
+                    {e.image && <AdjustButton src={e.image} frame={e.frame} aspect={3 / 4} onSave={(f) => edit((ch) => void (ch.eras![i].frame = f))} label="✥" className="btn small" />}
+                    <ImagePick className="btn small" maxDim={1000} onPick={([src]) => edit((ch) => { ch.eras![i].image = src; ch.eras![i].frame = undefined; })}>{e.image ? '↻' : '+ Picture'}</ImagePick>
+                  </span>
+                </DropZone>
                 <Field multiline className="era-name" value={e.name} placeholder="e.g. Age 12 · After the war" onChange={(v) => edit((ch) => void (ch.eras![i].name = v))} />
                 <Field multiline className="small" value={e.description} placeholder="What's different about them now?" onChange={(v) => edit((ch) => void (ch.eras![i].description = v))} />
                 <div className="row end">

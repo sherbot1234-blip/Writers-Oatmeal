@@ -120,6 +120,7 @@ export function cloneSectionShape(s: Section): Section {
     stats: s.stats?.map((f) => ({ id: uid(), label: f.label, value: 5 })),
     tags: s.kind === 'tags' ? [] : undefined,
     images: s.kind === 'images' ? [] : undefined,
+    imageFrames: undefined,
     quotes: s.kind === 'quotes' ? [] : undefined,
     voice: s.kind === 'quotes' ? '' : undefined,
   };

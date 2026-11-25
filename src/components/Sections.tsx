@@ -2,9 +2,17 @@ import { useState } from 'react';
 import type { Section, SectionKind } from '../types';
 import { makeSection, SECTION_KINDS } from '../defaults';
 import { move, uid } from '../util';
-import { Field, ImagePick, Lightbox, RadarChart, TagInput } from './ui';
+import { DropZone, Field, ImagePick, Lightbox, RadarChart, TagInput } from './ui';
+import { AdjustButton, FramedImg } from './Framed';
 
 type Edit = (fn: (sections: Section[]) => void) => void;
+
+/** Adds pictures to a gallery section, keeping the framing list lined up with the pictures. */
+function addImages(s: Section, srcs: string[]) {
+  const imgs = (s.images ??= []);
+  s.imageFrames = imgs.map((_, k) => s.imageFrames?.[k] ?? null).concat(srcs.map(() => null));
+  imgs.push(...srcs);
+}
 
 /**
  * Renders an editable list of sections. In templateMode only the structure
@@ -179,17 +187,27 @@ function SectionCard({
         (templateMode ? (
           <p className="muted small">Image gallery, filled in per character.</p>
         ) : (
-          <div className="mini-gallery">
+          <DropZone multiple className="mini-gallery" onPick={(srcs) => edit((s) => addImages(s, srcs))}>
             {(sec.images ?? []).map((src, i) => (
               <div className="mini-img" key={i}>
-                <img src={src} alt="" onClick={() => setLightbox(src)} />
-                <button className="icon-btn tiny danger" onClick={() => edit((s) => void s.images!.splice(i, 1))}>×</button>
+                <FramedImg src={src} frame={sec.imageFrames?.[i]} className="fill zoomable" onClick={() => setLightbox(src)} />
+                <span className="mini-img-tools">
+                  <AdjustButton
+                    src={src}
+                    frame={sec.imageFrames?.[i]}
+                    aspect={1}
+                    label="✥"
+                    className="icon-btn tiny"
+                    onSave={(f) => edit((s) => { const fr = s.imageFrames ?? []; while (fr.length < (s.images?.length ?? 0)) fr.push(null); fr[i] = f; s.imageFrames = fr; })}
+                  />
+                  <button className="icon-btn tiny danger" title="Remove picture" onClick={() => edit((s) => { s.images!.splice(i, 1); s.imageFrames?.splice(i, 1); })}>×</button>
+                </span>
               </div>
             ))}
-            <ImagePick multiple className="mini-add" onPick={(srcs) => edit((s) => void (s.images ??= []).push(...srcs))}>
-              + Image
+            <ImagePick multiple className="mini-add" onPick={(srcs) => edit((s) => addImages(s, srcs))}>
+              + Image<br /><span className="small">or drop here</span>
             </ImagePick>
-          </div>
+          </DropZone>
         ))}
       {sec.kind === 'quotes' &&
         (templateMode ? (

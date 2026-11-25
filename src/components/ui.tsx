@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { imageFileToDataUrl, SWATCHES } from '../util';
+import { dropToImages, hasDroppable, readDrop } from '../images';
+import { FramedImg } from './Framed';
 import type { Character } from '../types';
 
 /** Text that looks like plain text until you click into it. */
@@ -69,7 +71,50 @@ export function Modal({ title, onClose, children, wide }: { title: ReactNode; on
   );
 }
 
-/** Button that opens a file picker for one or many images. */
+/** Handles a picture drop: shows the "busy" state and hands back stored pictures. */
+function useImageDrop(onPick: (srcs: string[]) => void, multiple?: boolean, maxDim?: number) {
+  const [over, setOver] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const depth = useRef(0);
+  const handlers = {
+    onDragEnter: (e: React.DragEvent) => {
+      if (!hasDroppable(e.dataTransfer)) return;
+      e.preventDefault();
+      depth.current++;
+      setOver(true);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (!hasDroppable(e.dataTransfer)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    },
+    onDragLeave: () => {
+      depth.current = Math.max(0, depth.current - 1);
+      if (!depth.current) setOver(false);
+    },
+    onDrop: async (e: React.DragEvent) => {
+      if (!hasDroppable(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      depth.current = 0;
+      setOver(false);
+      const d = readDrop(e.dataTransfer); // must happen before any await
+      if (!d.files.length && !d.urls.length) return;
+      setBusy(true);
+      try {
+        const srcs = await dropToImages(multiple ? d : { files: d.files.slice(0, 1), urls: d.files.length ? [] : d.urls.slice(0, 1) }, maxDim);
+        if (srcs.length) onPick(srcs);
+      } catch {
+        alert('Sorry, that picture could not be read.');
+      } finally {
+        setBusy(false);
+      }
+    },
+  };
+  return { over, busy, setBusy, handlers };
+}
+
+/** Button that opens a file picker for one or many images. Pictures can also be dropped on it. */
 export function ImagePick({
   onPick,
   multiple,
@@ -84,10 +129,10 @@ export function ImagePick({
   maxDim?: number;
 }) {
   const ref = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const { over, busy, setBusy, handlers } = useImageDrop(onPick, multiple, maxDim);
   return (
     <>
-      <button type="button" className={className} onClick={() => ref.current?.click()} disabled={busy}>
+      <button type="button" className={className + (over ? ' drop-over' : '')} onClick={() => ref.current?.click()} disabled={busy} {...handlers}>
         {busy ? 'Loading…' : children}
       </button>
       <input
@@ -114,7 +159,37 @@ export function ImagePick({
   );
 }
 
-export function Avatar({ c, size = 40 }: { c: Pick<Character, 'name' | 'image' | 'color'>; size?: number }) {
+/**
+ * Any area you can drop pictures onto (from your computer or another website).
+ * Shows a "drop here" overlay while something is dragged over it.
+ */
+export function DropZone({
+  onPick,
+  multiple,
+  maxDim,
+  className = '',
+  style,
+  label,
+  children,
+}: {
+  onPick: (srcs: string[]) => void;
+  multiple?: boolean;
+  maxDim?: number;
+  className?: string;
+  style?: CSSProperties;
+  label?: string;
+  children?: ReactNode;
+}) {
+  const { over, busy, handlers } = useImageDrop(onPick, multiple, maxDim);
+  return (
+    <div className={'dropzone ' + className + (over ? ' over' : '')} style={style} {...handlers}>
+      {children}
+      {(over || busy) && <div className="drop-overlay">{busy ? 'Adding…' : label ?? (multiple ? 'Drop pictures here' : 'Drop picture here')}</div>}
+    </div>
+  );
+}
+
+export function Avatar({ c, size = 40 }: { c: Pick<Character, 'name' | 'image' | 'color' | 'imageFrame'>; size?: number }) {
   const initials = (c.name || '?')
     .split(/\s+/)
     .map((w) => w[0])
@@ -126,7 +201,7 @@ export function Avatar({ c, size = 40 }: { c: Pick<Character, 'name' | 'image' |
       className="avatar"
       style={{ width: size, height: size, fontSize: size * 0.38, background: c.image ? undefined : c.color, borderColor: c.color }}
     >
-      {c.image ? <img src={c.image} alt="" /> : initials}
+      {c.image ? <FramedImg src={c.image} frame={c.imageFrame} className="avatar-img" /> : initials}
     </span>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { pathFor, useStoryCtx } from '../storyContext';
-import { Avatar, Field, ImagePick, TagInput } from '../components/ui';
+import { Avatar, DropZone, Field, ImagePick, TagInput } from '../components/ui';
+import { AdjustButton, FramedImg } from '../components/Framed';
 import { Links } from '../components/Links';
 import { useLibrary } from '../store';
 import { makeStory, makeUniverse, STATUSES, statusInfo } from '../defaults';
@@ -133,16 +134,22 @@ export default function Overview() {
 }
 
 function Cover({ story, upd }: { story: Story; upd: ReturnType<typeof useStoryCtx>['upd'] }) {
+  const setCover = ([src]: string[]) =>
+    upd((s) => {
+      s.cover = src;
+      s.coverFrame = undefined; // a new picture starts centred
+    });
   return (
-    <div className="hero-cover" style={story.cover ? { backgroundImage: `url(${story.cover})` } : undefined}>
-      {!story.cover && <span className="muted">No cover yet</span>}
+    <DropZone className="hero-cover" onPick={setCover} label="Drop a cover here">
+      {story.cover ? <FramedImg src={story.cover} frame={story.coverFrame} className="fill" /> : <span className="muted">No cover yet<br /><span className="small">drag a picture here</span></span>}
       <div className="hero-cover-actions">
-        <ImagePick className="btn small" onPick={([src]) => upd((s) => void (s.cover = src))}>
+        <ImagePick className="btn small" onPick={setCover}>
           {story.cover ? 'Change cover' : 'Add cover'}
         </ImagePick>
-        {story.cover && <button className="btn small ghost" onClick={() => upd((s) => void (s.cover = undefined))}>Remove</button>}
+        {story.cover && <AdjustButton src={story.cover} frame={story.coverFrame} aspect={2 / 3} onSave={(f) => upd((s) => void (s.coverFrame = f))} />}
+        {story.cover && <button className="btn small ghost" onClick={() => upd((s) => { s.cover = undefined; s.coverFrame = undefined; })}>Remove</button>}
       </div>
-    </div>
+    </DropZone>
   );
 }
 
