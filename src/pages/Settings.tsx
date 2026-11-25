@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pathFor, useStoryCtx } from '../storyContext';
 import { useLibrary } from '../store';
-import { ImagePick } from '../components/ui';
+import { DropZone, ImagePick } from '../components/ui';
+import { AdjustButton, FramedImg } from '../components/Framed';
 import { THEME_PRESETS } from '../defaults';
 import { download, ensureFonts, FONT_OPTIONS, fontStack, move, slug, uid } from '../util';
 import type { Palette, Theme } from '../types';
@@ -98,10 +99,14 @@ export default function Settings() {
           <input className="input slim" style={{ width: 140 }} placeholder="or type your own" value={ORNAMENTS.includes(t.ornament) ? '' : t.ornament} onChange={(e) => setTheme({ ornament: e.target.value })} />
         </div>
         <label className="lbl">Banner across the top of every page</label>
-        <div className="row gap wrap">
-          <ImagePick className="btn small" maxDim={2400} onPick={([src]) => setTheme({ banner: src })}>{t.banner ? 'Change banner' : 'Upload banner'}</ImagePick>
-          {t.banner && <button className="btn small ghost" onClick={() => setTheme({ banner: undefined })}>Remove</button>}
-        </div>
+        <DropZone className="banner-drop" maxDim={2400} onPick={([src]) => setTheme({ banner: src, bannerFrame: undefined })} label="Drop a banner picture">
+          {t.banner ? <FramedImg src={t.banner} frame={t.bannerFrame} className="banner-preview" /> : <p className="muted small banner-empty">Drag a wide picture here, or upload one.</p>}
+          <div className="row gap wrap">
+            <ImagePick className="btn small" maxDim={2400} onPick={([src]) => setTheme({ banner: src, bannerFrame: undefined })}>{t.banner ? 'Change banner' : 'Upload banner'}</ImagePick>
+            {t.banner && <AdjustButton src={t.banner} frame={t.bannerFrame} aspect={8} onSave={(f) => setTheme({ bannerFrame: f })} />}
+            {t.banner && <button className="btn small ghost" onClick={() => setTheme({ banner: undefined, bannerFrame: undefined })}>Remove</button>}
+          </div>
+        </DropZone>
       </section>
 
       <section className="card">
@@ -186,10 +191,11 @@ export default function Settings() {
 
       <section className="card">
         <h2 className="sec-title">Background image</h2>
-        <div className="row gap wrap">
+        <DropZone className="row gap wrap bg-drop" maxDim={2400} onPick={([src]) => setTheme({ bgImage: src })} label="Drop a background picture">
           <ImagePick className="btn" maxDim={2400} onPick={([src]) => setTheme({ bgImage: src })}>{t.bgImage ? 'Change image' : 'Upload image'}</ImagePick>
           {t.bgImage && <button className="btn ghost" onClick={() => setTheme({ bgImage: undefined })}>Remove</button>}
-        </div>
+          <span className="muted small">or drag a picture here</span>
+        </DropZone>
         {t.bgImage && (
           <label style={{ display: 'block', marginTop: 12 }}>
             <span className="lbl">Fade image into background colour: {t.bgOverlay}%</span>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
-import { Avatar, ColorPick, Empty, Field, Modal } from '../components/ui';
+import { Avatar, ColorPick, DropZone, Empty, Field, Modal } from '../components/ui';
+import { FramedImg } from '../components/Framed';
 import { SectionList } from '../components/Sections';
 import { cloneSectionShape, defaultCharacterTemplate } from '../defaults';
 import { move, SWATCHES, uid } from '../util';
@@ -69,10 +70,16 @@ export default function Characters() {
         const facts = c.sections.find((x) => x.kind === 'facts')?.facts?.filter((f) => f.value).slice(0, 3) ?? [];
         const myCats = catsOf(story, c.id);
         return (
-          <div key={c.id} className="char-card card" style={{ borderTopColor: c.color }}>
+          <DropZone
+            key={c.id}
+            className="char-card card"
+            style={{ borderTopColor: c.color }}
+            label={`Drop a picture of ${c.name || 'them'}`}
+            onPick={([src]) => upd((s) => { const x = s.characters.find((y) => y.id === c.id); if (x) { x.image = src; x.imageFrame = undefined; } })}
+          >
             <Link to={`${base}/characters/${c.id}`} className="char-card-link">
-              <div className="char-card-img" style={{ background: c.image ? `url(${c.image}) center/cover` : c.color + '33' }}>
-                {!c.image && <Avatar c={c} size={72} />}
+              <div className="char-card-img" style={{ background: c.color + '33' }}>
+                {c.image ? <FramedImg src={c.image} frame={c.imageFrame} className="fill" /> : <Avatar c={c} size={72} />}
               </div>
               <div className="char-card-body">
                 {(sharedIds.has(c.id) || myCats.length > 0) && (
@@ -106,7 +113,7 @@ export default function Characters() {
                 ))}
               </div>
             )}
-          </div>
+          </DropZone>
         );
       })}
       <button className="char-card add card" onClick={() => add(catId)}>+ New character</button>

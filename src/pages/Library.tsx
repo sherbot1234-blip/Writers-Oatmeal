@@ -8,6 +8,7 @@ import type { Story, StoryStatus, Theme } from '../types';
 import { pathFor } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
 import { OatLogo } from '../components/Logo';
+import { FramedImg } from '../components/Framed';
 
 /** The colours in use right now: the main palette, or the second mood if it's switched on. */
 export function palette(t: Theme) {
@@ -359,7 +360,7 @@ function Cover({ s }: { s: Story }) {
   return (
     <Link to={pathFor(s)} className="book cover" style={{ ...themeVars(t), background: t.bg, color: t.text }} aria-label={s.title}>
       {s.cover ? (
-        <img src={s.cover} alt="" />
+        <FramedImg src={s.cover} frame={s.coverFrame} className="cover-img" />
       ) : (
         <span className="gen-cover" style={{ background: `radial-gradient(circle at 50% 35%, color-mix(in srgb, ${t.accent} 45%, ${t.bg}), ${t.bg} 70%)` }}>
           <span className="gen-orn" style={{ color: t.accent }}>❦</span>

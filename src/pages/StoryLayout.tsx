@@ -6,6 +6,7 @@ import { palette, SaveBadge, themeVars } from './Library';
 import type { TabKey } from '../types';
 import { pathFor, type StoryCtx } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
+import { FramedImg } from '../components/Framed';
 
 const TAB_ICONS: Record<TabKey, string> = {
   overview: '📖',
@@ -57,7 +58,11 @@ export default function StoryLayout() {
         </div>
       )}
       {t.texture !== 'none' && <div className="story-texture" aria-hidden />}
-      {t.banner && <div className="story-banner" style={{ backgroundImage: `url(${t.banner})` }} aria-hidden />}
+      {t.banner && (
+        <div className="story-banner" aria-hidden>
+          <FramedImg src={t.banner} frame={t.bannerFrame} className="fill" />
+        </div>
+      )}
       <header className="story-head">
         <Link to="/" className="back" title="All stories">← Library</Link>
         {universe && (

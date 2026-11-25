@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
 import { useStory, type StoryUpdater } from '../store';
-import { Avatar, CharacterChips, Empty, Field, ImagePick, Modal } from '../components/ui';
+import { Avatar, CharacterChips, DropZone, Empty, Field, ImagePick, Modal } from '../components/ui';
+import { AdjustButton, FramedImg } from '../components/Framed';
 import { QUESTION_BANK } from '../defaults';
 import { move, uid } from '../util';
 import type { Character, LoreEntry, Pin, Story, WorldImage } from '../types';
@@ -170,7 +171,7 @@ function WikiHome({ w, onSelect }: { w: Story; onSelect: (id: string) => void })
     <div className="wiki-home">
       {w.lore.map((e) => (
         <button key={e.id} className="card wiki-tile" onClick={() => onSelect(e.id)}>
-          {e.image ? <img src={e.image} alt="" /> : <span className="wiki-tile-noimg">📜</span>}
+          {e.image ? <FramedImg src={e.image} frame={e.imageFrame} className="wiki-tile-img" /> : <span className="wiki-tile-noimg">📜</span>}
           <span className="kind-badge">{e.category}</span>
           <b>{e.name || 'Untitled page'}</b>
           {e.summary && <span className="muted small">{e.summary}</span>}
@@ -191,10 +192,13 @@ function EntryPage({ w, wu, characters, entry, cats, onSelect }: WorldProps & { 
     <article className="card entry">
       <button className="btn small ghost wiki-back" onClick={() => onSelect(null)}>← All pages</button>
       <div className="entry-top">
-        <div className="entry-img" style={entry.image ? { backgroundImage: `url(${entry.image})` } : undefined}>
-          {!entry.image && <span className="muted small">No picture</span>}
-          <ImagePick className="btn small entry-img-btn" maxDim={1600} onPick={([src]) => set((e) => void (e.image = src))}>{entry.image ? '↻' : '+ Picture'}</ImagePick>
-        </div>
+        <DropZone className="entry-img" maxDim={1600} onPick={([src]) => set((e) => { e.image = src; e.imageFrame = undefined; })}>
+          {entry.image ? <FramedImg src={entry.image} frame={entry.imageFrame} className="fill" /> : <span className="muted small">No picture<br />drag one here</span>}
+          <span className="entry-img-btn row gap">
+            {entry.image && <AdjustButton src={entry.image} frame={entry.imageFrame} aspect={4 / 3} label="✥" onSave={(f) => set((e) => void (e.imageFrame = f))} />}
+            <ImagePick className="btn small" maxDim={1600} onPick={([src]) => set((e) => { e.image = src; e.imageFrame = undefined; })}>{entry.image ? '↻' : '+ Picture'}</ImagePick>
+          </span>
+        </DropZone>
         <div className="entry-head">
           <select className="input slim" value={entry.category} onChange={(e) => set((x) => void (x.category = e.target.value))}>
             {cats.map((c) => (
@@ -280,19 +284,20 @@ function Maps({ w, wu, onOpenEntry }: WorldProps & { onOpenEntry: (id: string) =
   return (
     <>
       <div className="row between wrap gap" style={{ marginBottom: 12 }}>
-        <span className="muted small">Click a map to open it and drop 📍 pins that link to wiki pages.</span>
+        <span className="muted small">Drag pictures anywhere here to add them. Click a map to open it and drop 📍 pins that link to wiki pages.</span>
         <ImagePick multiple maxDim={2400} className="btn primary" onPick={add}>+ Upload images</ImagePick>
       </div>
+      <DropZone multiple maxDim={2400} onPick={add} className="maps-drop" label="Drop maps & pictures here">
       {w.worldImages.length === 0 ? (
         <Empty icon="🗺️" title="No maps or images yet">
-          <p className="muted">Upload maps, location art, moodboards, flags, family crests, anything that shows your world.</p>
+          <p className="muted">Drag in maps, location art, moodboards, flags, family crests, anything that shows your world, or use <b>+ Upload images</b>.</p>
         </Empty>
       ) : (
         <div className="gallery">
           {w.worldImages.map((im, i) => (
             <figure key={im.id} className="card gal-item">
               <div className="gal-img" onClick={() => setOpen(im.id)}>
-                <img src={im.src} alt={im.title} />
+                <FramedImg src={im.src} frame={im.frame} alt={im.title} className="gal-thumb" />
                 {(im.pins?.length ?? 0) > 0 && <span className="pin-count">📍 {im.pins!.length}</span>}
               </div>
               <figcaption>
@@ -300,7 +305,8 @@ function Maps({ w, wu, onOpenEntry }: WorldProps & { onOpenEntry: (id: string) =
                 <Field multiline className="small" value={im.caption} placeholder="Notes…" onChange={(v) => wu((s) => void (s.worldImages[i].caption = v))} />
                 <div className="row end">
                   <button className="icon-btn" title="Move earlier" onClick={() => wu((s) => move(s.worldImages, i, i - 1))}>←</button>
-                  <ImagePick className="icon-btn" maxDim={2400} onPick={([src]) => wu((s) => void (s.worldImages[i].src = src))}>↻</ImagePick>
+                  <AdjustButton src={im.src} frame={im.frame} aspect={4 / 3} label="✥" className="icon-btn" onSave={(f) => wu((s) => void (s.worldImages[i].frame = f))} />
+                  <ImagePick className="icon-btn" maxDim={2400} onPick={([src]) => wu((s) => { s.worldImages[i].src = src; s.worldImages[i].frame = undefined; })}>↻</ImagePick>
                   <button className="icon-btn danger" title="Delete" onClick={() => confirm('Delete this image and its pins?') && wu((s) => void s.worldImages.splice(i, 1))}>🗑</button>
                 </div>
               </figcaption>
@@ -308,6 +314,7 @@ function Maps({ w, wu, onOpenEntry }: WorldProps & { onOpenEntry: (id: string) =
           ))}
         </div>
       )}
+      </DropZone>
       {img && <MapViewer w={w} wu={wu} img={img} onClose={() => setOpen(null)} onOpenEntry={(id) => { setOpen(null); onOpenEntry(id); }} />}
     </>
   );

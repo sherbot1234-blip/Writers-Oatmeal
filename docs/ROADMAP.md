@@ -30,6 +30,7 @@ Each story looks completely different from the others. **Milanote** stays my mai
 - [x] World: wiki pages (custom categories, facts, related pages, backlinks), clickable map pins linked to pages, world history timeline, glossary, all shareable at universe level and searchable while writing
 - [x] Style packs (Game HUD with Whimsy ↔ Dark moods, Field Journal, Case File, Parchment Scroll, Gothic, Cute Pastel, Comic Book, Starlight, Clean), fine-tuning of cards, textures, headings, ornaments, banner, second mood; custom pages from templates; cosier default look
 - [x] Tweaks after first use: character categories (multi-category, grouped + tabs, used in cast lists), faster relationships (only added ones, mutual by default, one-click type picking, bulk add, timeline tucked into Details), hand-made family trees on a free canvas (several per story, name-only people, custom line types, notes), one Milanote board field per story shown everywhere
+- [x] Pictures: adjust (move / zoom / fill or show whole) everywhere without changing the original; drag & drop from the computer or other websites (with a link fallback); saving made instant with a safety net when leaving the page
 - [x] Universes / series: series order, shared characters (edit once, shows in every story), universe-level world, songs and relationships
 
 ## Next, in order

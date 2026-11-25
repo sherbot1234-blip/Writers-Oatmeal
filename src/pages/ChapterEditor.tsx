@@ -8,6 +8,7 @@ import { removeCommentMark, RichEditor, scrollToComment } from '../components/Ed
 import { Avatar, Field, Lightbox } from '../components/ui';
 import { uid } from '../util';
 import { groupCharacters } from '../categories';
+import { FramedImg } from '../components/Framed';
 import { AddSong, MiniSongs, Player } from '../components/Music';
 import type { Chapter, ChapterStatus, Character, Story } from '../types';
 
@@ -280,7 +281,7 @@ function CastDetail({ c }: { c: Character }) {
   const voice = c.sections.map((s) => (s.kind === 'quotes' ? s.voice : '')).filter(Boolean).join(' ');
   return (
     <div className="cast-detail small">
-      {c.image && <img src={c.image} alt="" />}
+      {c.image && <FramedImg src={c.image} frame={c.imageFrame} className="cast-detail-img" />}
       {facts.map((f) => (
         <div key={f.id}><span className="muted">{f.label}:</span> {f.value}</div>
       ))}
@@ -366,7 +367,7 @@ function WorldPanel({ story, universe }: { story: Story; universe?: Story }) {
       {images.length > 0 && !q && (
         <div className="side-gallery">
           {images.map((img) => (
-            <img key={img.id} src={img.src} alt={img.title} title={img.title} onClick={() => setZoom(img.id)} />
+            <FramedImg key={img.id} src={img.src} frame={img.frame} alt={img.title} className="side-thumb zoomable" onClick={() => setZoom(img.id)} />
           ))}
         </div>
       )}

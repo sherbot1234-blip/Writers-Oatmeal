@@ -26,6 +26,14 @@ import Settings from './pages/Settings';
 import './styles.css';
 import { completeLoginIfReturning } from './spotify';
 
+// A picture dropped just outside a drop area would make the browser open it and leave the site.
+window.addEventListener('dragover', (e) => {
+  if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+});
+window.addEventListener('drop', (e) => {
+  if (e.dataTransfer?.types.includes('Files') && !e.defaultPrevented) e.preventDefault();
+});
+
 // finish a Spotify sign-in first if we've just come back from it, then start the app
 completeLoginIfReturning().finally(() =>
 ReactDOM.createRoot(document.getElementById('root')!).render(
