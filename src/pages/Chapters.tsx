@@ -3,6 +3,7 @@ import { useStoryCtx } from '../storyContext';
 import { downloadManuscript, moveChapter, useChapters } from '../chapters';
 import { CHAPTER_STATUSES, makeChapter } from '../defaults';
 import { Avatar, Empty } from '../components/ui';
+import { trashChapter } from '../trash';
 
 export default function Chapters() {
   const { story, base } = useStoryCtx();
@@ -73,12 +74,8 @@ export default function Chapters() {
                     className="icon-btn tiny danger"
                     title="Delete chapter"
                     onClick={() => {
-                      if (!confirm(`Delete “${c.title || `Chapter ${i + 1}`}”${c.words ? ` and its ${c.words.toLocaleString()} words` : ''}? This can't be undone.`)) return;
-                      update((d) => {
-                        d.chapters = d.chapters.filter((x) => x.id !== c.id);
-                        const s = d.stories.find((x) => x.id === story.id);
-                        s?.arcs.forEach((a) => a.points.forEach((p) => p.chapterId === c.id && (p.chapterId = undefined)));
-                      });
+                      if (!confirm(`Delete “${c.title || `Chapter ${i + 1}`}”${c.words ? ` and its ${c.words.toLocaleString()} words` : ''}? It goes to the bin for 30 days.`)) return;
+                      update((d) => trashChapter(d, c.id));
                     }}
                   >
                     🗑

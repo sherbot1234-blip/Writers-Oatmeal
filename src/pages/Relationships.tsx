@@ -8,9 +8,10 @@ import { move, uid } from '../util';
 import { emptyState, isEmptyState, latest, partnersOf, relFor, stateAt, typesOf } from '../relations';
 import { groupCharacters } from '../categories';
 import type { Character, Relationship, RelState, Story } from '../types';
-import type { StoryUpdater } from '../store';
+import { useLibrary, type StoryUpdater } from '../store';
+import { trashItem } from '../trash';
 
-type View = 'cards' | 'web' | 'types';
+type View = 'cards' | 'chart' | 'web' | 'types';
 
 /** Applies an edit to the state that's in effect by the end of the story (where it was last set). */
 function editLatest(s: Draft<Story>, r: Draft<Relationship>, fn: (st: RelState) => void) {
@@ -26,23 +27,33 @@ export default function Relationships() {
   const [view, setView] = useState<View>('cards');
   const [details, setDetails] = useState<{ from: string; to: string } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addingPov, setAddingPov] = useState(false);
   const chars = story.characters;
-  const focusId = chars.some((c) => c.id === params.get('focus')) ? params.get('focus')! : chars[0]?.id;
-  const focusIdx = chars.findIndex((c) => c.id === focusId);
-  const focus = chars[focusIdx];
+  // only the characters you've given a chart
+  const povs = story.relPovs.map((id) => chars.find((c) => c.id === id)).filter((c): c is Character => !!c);
+  const focusId = povs.some((c) => c.id === params.get('focus')) ? params.get('focus')! : povs[0]?.id;
+  const focusIdx = povs.findIndex((c) => c.id === focusId);
+  const focus = povs[focusIdx];
   const setFocus = (id: string) => {
     setParams({ focus: id }, { replace: true });
     setAdding(false);
   };
+  const addPov = (id: string) => {
+    upd((s) => void (!s.relPovs.includes(id) && s.relPovs.push(id)));
+    setFocus(id);
+    setAddingPov(false);
+  };
   const others = focus ? partnersOf(story, focus.id).map((id) => chars.find((c) => c.id === id)).filter((c): c is Character => !!c) : [];
+  const notYet = chars.filter((c) => !story.relPovs.includes(c.id));
+  const isPage = view === 'cards' || view === 'chart';
 
   return (
-    <div className="page">
+    <div className={'page' + (view === 'chart' ? ' wide' : '')}>
       <div className="page-head">
         <h1>Relationships</h1>
         <div className="seg">
-          <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Cards</button>
-          <button className={view === 'web' ? 'on' : ''} onClick={() => setView('web')}>Web</button>
+          <button className={isPage ? 'on' : ''} onClick={() => setView('cards')}>By POV</button>
+          <button className={view === 'web' ? 'on' : ''} onClick={() => setView('web')}>Everyone (web)</button>
           <button className={view === 'types' ? 'on' : ''} onClick={() => setView('types')}>Types & meters</button>
         </div>
       </div>
@@ -54,49 +65,98 @@ export default function Relationships() {
           <Link className="btn" to={`${base}/characters`}>Go to characters</Link>
         </Empty>
       ) : view === 'web' ? (
-        <RelWeb story={story} onPick={(id) => { setFocus(id); setView('cards'); }} />
+        <RelWeb story={story} onPick={(id) => { if (story.relPovs.includes(id)) { setFocus(id); setView('cards'); } }} />
       ) : (
         <>
           <div className="focus-bar card">
-            <button className="icon-btn big" onClick={() => setFocus(chars[(focusIdx - 1 + chars.length) % chars.length].id)} aria-label="Previous character">‹</button>
             <div className="focus-list">
-              {groupCharacters(story, chars).map((g, gi) => (
-                <div key={g.cat?.id ?? 'none' + gi} className="focus-group">
-                  {story.charCategories.length > 0 && <span className="focus-group-label" style={g.cat ? { color: g.cat.color } : undefined}>{g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Other'}</span>}
-                  <div className="focus-group-chars">
+              {povs.map((c) => (
+                <span key={c.id} className="pov-chip-wrap">
+                  <button className={'focus-chip' + (c.id === focusId ? ' on' : '')} onClick={() => setFocus(c.id)} style={c.id === focusId ? { borderColor: c.color } : undefined} title={c.name}>
+                    <Avatar c={c} size={c.id === focusId ? 48 : 36} />
+                    <span>{c.name || 'Unnamed'}</span>
+                  </button>
+                  <button
+                    className="pov-remove"
+                    title={`Remove ${c.name || 'this character'}'s chart`}
+                    onClick={() =>
+                      confirm(`Remove ${c.name || 'this character'}'s chart? Their relationships are kept, and still show on other characters' charts.`) &&
+                      upd((s) => {
+                        s.relPovs = s.relPovs.filter((x) => x !== c.id);
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {notYet.length > 0 && (
+                <button className="focus-chip add-pov" onClick={() => setAddingPov(!addingPov)}>
+                  <span className="add-pov-plus">+</span>
+                  <span>Add POV</span>
+                </button>
+              )}
+            </div>
+          </div>
+          {addingPov && (
+            <div className="card add-rel">
+              <label className="lbl" style={{ marginTop: 0 }}>Who gets a relationship chart from their point of view?</label>
+              {groupCharacters(story, notYet).map((g, gi) => (
+                <div key={g.cat?.id ?? 'none' + gi} className="add-rel-group">
+                  {story.charCategories.length > 0 && <span className="muted small">{g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Other'}</span>}
+                  <div className="chip-row">
                     {g.chars.map((c) => (
-                      <button key={c.id} className={'focus-chip' + (c.id === focusId ? ' on' : '')} onClick={() => setFocus(c.id)} style={c.id === focusId ? { borderColor: c.color } : undefined} title={c.name}>
-                        <Avatar c={c} size={c.id === focusId ? 48 : 36} />
-                        <span>{c.name || 'Unnamed'}</span>
+                      <button key={c.id} className="chip" onClick={() => addPov(c.id)}>
+                        <Avatar c={c} size={20} /> {c.name || 'Unnamed'}
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
+              <div className="row end"><button className="btn small ghost" onClick={() => setAddingPov(false)}>Cancel</button></div>
             </div>
-            <button className="icon-btn big" onClick={() => setFocus(chars[(focusIdx + 1) % chars.length].id)} aria-label="Next character">›</button>
-          </div>
+          )}
 
-          <div className="row between wrap gap focus-title-row">
-            <h2 className="focus-title">
-              <Avatar c={focus} size={36} /> {focus.name || 'Unnamed'}&rsquo;s relationships <span className="muted small">({others.length})</span>
-            </h2>
-            {!adding && <button className="btn primary" onClick={() => setAdding(true)}>+ Add relationship</button>}
-          </div>
-
-          {adding && <AddRelationship story={story} focus={focus} onDone={() => setAdding(false)} />}
-
-          {others.length === 0 && !adding ? (
-            <div className="card empty-rel">
-              <p className="muted">No relationships for {focus.name || 'this character'} yet.</p>
-              <button className="btn" onClick={() => setAdding(true)}>+ Add relationship</button>
-            </div>
+          {!focus ? (
+            <Empty icon="💞" title="No relationship charts yet">
+              <p className="muted">Pick the characters whose point of view matters, like your leads or narrators. Each gets their own chart of everyone they know.</p>
+              <button className="btn primary" onClick={() => setAddingPov(true)}>+ Add a POV character</button>
+            </Empty>
           ) : (
-            <div className="rel-list">
-              {others.map((o) => (
-                <RelRow key={o.id} story={story} a={focus} b={o} onFocus={() => setFocus(o.id)} onDetails={(from, to) => setDetails({ from, to })} />
-              ))}
-            </div>
+            <>
+              <div className="row between wrap gap focus-title-row">
+                <h2 className="focus-title">
+                  <Avatar c={focus} size={36} /> {focus.name || 'Unnamed'}&rsquo;s relationships <span className="muted small">({others.length})</span>
+                </h2>
+                <div className="row gap wrap">
+                  <div className="seg">
+                    <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Cards</button>
+                    <button className={view === 'chart' ? 'on' : ''} onClick={() => setView('chart')}>Chart</button>
+                  </div>
+                  {view === 'cards' && !adding && <button className="btn primary" onClick={() => setAdding(true)}>+ Add relationship</button>}
+                </div>
+              </div>
+
+              {view === 'chart' ? (
+                <RelChart story={story} pov={focus} onDetails={(from, to) => setDetails({ from, to })} />
+              ) : (
+                <>
+                  {adding && <AddRelationship story={story} focus={focus} onDone={() => setAdding(false)} />}
+                  {others.length === 0 && !adding ? (
+                    <div className="card empty-rel">
+                      <p className="muted">No relationships for {focus.name || 'this character'} yet.</p>
+                      <button className="btn" onClick={() => setAdding(true)}>+ Add relationship</button>
+                    </div>
+                  ) : (
+                    <div className="rel-list">
+                      {others.map((o) => (
+                        <RelRow key={o.id} story={story} a={focus} b={o} onFocus={() => story.relPovs.includes(o.id) && setFocus(o.id)} onDetails={(from, to) => setDetails({ from, to })} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
         </>
       )}
@@ -104,6 +164,218 @@ export default function Relationships() {
       {details && (
         <RelEditor key={details.from + details.to} story={story} from={details.from} to={details.to} onSwitch={() => setDetails({ from: details.to, to: details.from })} onClose={() => setDetails(null)} />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- one POV's chart (a canvas like the family tree)
+
+const CW = 1400;
+const CH = 860;
+const NW = 126;
+const NH = 82;
+
+function RelChart({ story, pov, onDetails }: { story: Story; pov: Character; onDetails: (from: string, to: string) => void }) {
+  const { upd } = useStoryCtx();
+  const [sel, setSel] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(0.9);
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+  const dragRef = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null);
+  const [q, setQ] = useState('');
+  const spots = story.relCharts[pov.id] ?? [];
+  const partners = partnersOf(story, pov.id);
+  const onChart = [...new Set([...spots.map((x) => x.charId), ...partners])].filter((id) => id !== pov.id && story.characters.some((c) => c.id === id));
+  const center = { x: CW / 2 - NW / 2, y: CH / 2 - NH / 2 };
+
+  // people without a saved spot sit in a ring around the POV until you move them
+  const unplaced = onChart.filter((id) => !spots.some((x) => x.charId === id));
+  const pos = (id: string) => {
+    if (drag?.id === id) return drag;
+    if (id === pov.id) return center;
+    const sp = spots.find((x) => x.charId === id);
+    if (sp) return sp;
+    const i = unplaced.indexOf(id);
+    const n = Math.max(unplaced.length, 6);
+    const ang = (Math.PI * 2 * i) / n - Math.PI / 2;
+    return { x: center.x + Math.cos(ang) * 330, y: center.y + Math.sin(ang) * 270 };
+  };
+  const char = (id: string) => story.characters.find((c) => c.id === id)!;
+  const setSpot = (id: string, x: number, y: number) =>
+    upd((s) => {
+      const list = (s.relCharts[pov.id] ??= []);
+      const sp = list.find((p) => p.charId === id);
+      const sx = Math.round(Math.max(0, Math.min(CW - NW, x)) / 12) * 12;
+      const sy = Math.round(Math.max(0, Math.min(CH - NH, y)) / 12) * 12;
+      if (sp) Object.assign(sp, { x: sx, y: sy });
+      else list.push({ charId: id, x: sx, y: sy });
+    });
+
+  const onDown = (e: React.PointerEvent, id: string) => {
+    if (e.button !== 0 || id === pov.id) return;
+    const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+    const p = pos(id);
+    dragRef.current = { id, dx: (e.clientX - rect.left) / zoom - p.x, dy: (e.clientY - rect.top) / zoom - p.y, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+    d.moved = true;
+    setDrag({ id: d.id, x: (e.clientX - rect.left) / zoom - d.dx, y: (e.clientY - rect.top) / zoom - d.dy });
+  };
+  const onUp = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (d?.moved && drag) {
+      setSpot(d.id, drag.x, drag.y);
+      setSel(d.id);
+    }
+    setDrag(null);
+  };
+
+  const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2 + NW / 2, y: (a.y + b.y) / 2 + NH / 2 });
+  const lineFor = (other: string) => {
+    const mine = latest(relFor(story, pov.id, other), story.moments)?.state;
+    const theirs = latest(relFor(story, other, pov.id), story.moments)?.state;
+    return { mine: typesOf(story, mine), theirs: typesOf(story, theirs), mutual: !!relFor(story, pov.id, other)?.mutual, feeling: mine?.feeling ?? '' };
+  };
+  // relationships between the other people on this chart
+  const between = story.relationships.filter((r) => r.from !== pov.id && r.to !== pov.id && onChart.includes(r.from) && onChart.includes(r.to));
+  const available = story.characters.filter((c) => c.id !== pov.id && !onChart.includes(c.id) && (!q || c.name.toLowerCase().includes(q.toLowerCase())));
+  const selChar = sel ? story.characters.find((c) => c.id === sel) : undefined;
+
+  return (
+    <div className="tree-editor">
+      <aside className="tree-side card">
+        <label className="lbl" style={{ marginTop: 0 }}>Add to {pov.name || 'this'}&rsquo;s chart</label>
+        {story.characters.length > 8 && <input className="input slim" style={{ width: '100%', marginBottom: 6 }} placeholder="Find…" value={q} onChange={(e) => setQ(e.target.value)} />}
+        <div className="tree-people">
+          {groupCharacters(story, available).map((g, gi) => (
+            <div key={g.cat?.id ?? 'none' + gi}>
+              {story.charCategories.length > 0 && <div className="small muted tree-people-group">{g.cat ? `${g.cat.icon} ${g.cat.name}` : 'Others'}</div>}
+              {g.chars.map((c) => (
+                <button
+                  key={(g.cat?.id ?? '') + c.id}
+                  className="tree-person"
+                  onClick={() => {
+                    const p = pos(c.id);
+                    setSpot(c.id, p.x, p.y);
+                    setSel(c.id);
+                  }}
+                >
+                  <Avatar c={c} size={24} /> <span>{c.name || 'Unnamed'}</span> <span className="muted">+</span>
+                </button>
+              ))}
+            </div>
+          ))}
+          {!available.length && <p className="muted small">Everyone is on this chart.</p>}
+        </div>
+        <p className="muted small" style={{ marginTop: 12 }}>Drag people around {pov.name || 'them'}. Click someone to set how they relate; click a line for full details.</p>
+      </aside>
+
+      <div className="tree-main">
+        <div className="tree-toolbar card">
+          <span className="small muted">Lines: {pov.name || 'POV'} ↔ each person. Thin dotted lines: how the others relate to each other.</span>
+          <span className="row gap zoom">
+            <button className="icon-btn" onClick={() => setZoom(Math.max(0.4, +(zoom - 0.1).toFixed(1)))} aria-label="Zoom out">−</button>
+            <span className="small muted">{Math.round(zoom * 100)}%</span>
+            <button className="icon-btn" onClick={() => setZoom(Math.min(1.6, +(zoom + 0.1).toFixed(1)))} aria-label="Zoom in">+</button>
+          </span>
+        </div>
+        <div className="tree-canvas" onClick={(e) => e.target === e.currentTarget && setSel(null)}>
+          <div className="tree-board" style={{ width: CW * zoom, height: CH * zoom }}>
+            <div className="tree-scale" style={{ width: CW, height: CH, transform: `scale(${zoom})` }}>
+              <svg width={CW} height={CH} className="tree-lines">
+                {between.map((r) => {
+                  const a = pos(r.from), b = pos(r.to);
+                  const t = typesOf(story, latest(r, story.moments)?.state);
+                  const m = mid(a, b);
+                  return (
+                    <g key={r.id} className="chart-between">
+                      <line x1={a.x + NW / 2} y1={a.y + NH / 2} x2={b.x + NW / 2} y2={b.y + NH / 2} stroke={t[0]?.color ?? '#999'} strokeWidth={1.6} strokeDasharray="2 5" strokeLinecap="round" opacity={0.7} />
+                      {t.length > 0 && <text x={m.x} y={m.y} fontSize={12} textAnchor="middle" dominantBaseline="middle">{t.map((x) => x.emoji).join('')}</text>}
+                    </g>
+                  );
+                })}
+                {onChart.map((id) => {
+                  const a = pos(pov.id), b = pos(id);
+                  const l = lineFor(id);
+                  const color = (l.mine[0] ?? l.theirs[0])?.color ?? '#aaa';
+                  const m = mid(a, b);
+                  const label = l.mutual
+                    ? l.mine.map((t) => `${t.emoji} ${t.label}`).join(' · ')
+                    : [l.mine.map((t) => t.emoji).join('') || '·', l.theirs.map((t) => t.emoji).join('') || '·'].join('  ⇄  ');
+                  return (
+                    <g key={id} className="tree-link" onClick={(e) => { e.stopPropagation(); onDetails(pov.id, id); }}>
+                      <line x1={a.x + NW / 2} y1={a.y + NH / 2} x2={b.x + NW / 2} y2={b.y + NH / 2} stroke="transparent" strokeWidth={16} />
+                      <line x1={a.x + NW / 2} y1={a.y + NH / 2} x2={b.x + NW / 2} y2={b.y + NH / 2} stroke={color} strokeWidth={l.mine.length || l.theirs.length ? 3 : 1.5} strokeDasharray={l.mine.length || l.theirs.length ? undefined : '6 6'} />
+                      {label.trim() !== '·  ⇄  ·' && (
+                        <text x={m.x} y={m.y} className="tree-link-label" textAnchor="middle" dominantBaseline="middle" style={{ stroke: 'var(--surface)' }}>{label}</text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+              {[pov.id, ...onChart].map((id) => {
+                const c = char(id);
+                const p = pos(id);
+                const isPov = id === pov.id;
+                const feel = isPov ? '' : lineFor(id).feeling;
+                return (
+                  <div
+                    key={id}
+                    className={'tree-card chart-card' + (isPov ? ' pov' : '') + (sel === id ? ' on' : '')}
+                    style={{ left: p.x, top: p.y, width: NW, height: NH, borderColor: c.color }}
+                    onPointerDown={(e) => onDown(e, id)}
+                    onPointerMove={onMove}
+                    onPointerUp={onUp}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isPov) setSel(id);
+                    }}
+                  >
+                    <Avatar c={c} size={isPov ? 34 : 30} />
+                    <b className="tree-card-name">{c.name || 'Unnamed'}</b>
+                    {feel && <span className="tree-card-note" title={feel}>“{feel}”</span>}
+                    {isPov && <span className="tree-card-note">POV</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        {selChar && (
+          <div className="tree-inspector card chart-inspector">
+            <span className="row gap"><Avatar c={selChar} size={26} /><b>{selChar.name || 'Unnamed'}</b></span>
+            <div className="chart-sides">
+              {relFor(story, pov.id, selChar.id)?.mutual ? (
+                <SideLine story={story} rel={relFor(story, pov.id, selChar.id)} from={pov} to={selChar} label="⇄ each other" />
+              ) : (
+                <>
+                  <SideLine story={story} rel={relFor(story, pov.id, selChar.id)} from={pov} to={selChar} label={`${pov.name || 'POV'} → ${selChar.name || 'them'}`} />
+                  <SideLine story={story} rel={relFor(story, selChar.id, pov.id)} from={selChar} to={pov} label={`${selChar.name || 'They'} → ${pov.name || 'POV'}`} />
+                </>
+              )}
+            </div>
+            <span className="row gap">
+              <button className="btn small ghost" onClick={() => onDetails(pov.id, selChar.id)}>Details</button>
+              {!partnersOf(story, pov.id).includes(selChar.id) && (
+                <button
+                  className="btn small ghost"
+                  onClick={() => {
+                    upd((s) => void (s.relCharts[pov.id] = (s.relCharts[pov.id] ?? []).filter((x) => x.charId !== selChar.id)));
+                    setSel(null);
+                  }}
+                >
+                  Take off chart
+                </button>
+              )}
+              <button className="icon-btn" onClick={() => setSel(null)} aria-label="Close">✕</button>
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -288,6 +560,7 @@ function RelRow({ story, a, b, onFocus, onDetails }: { story: Story; a: Characte
 
 function RelEditor({ story, from, to, onSwitch, onClose }: { story: Story; from: string; to: string; onSwitch: () => void; onClose: () => void }) {
   const { upd } = useStoryCtx();
+  const { update } = useLibrary();
   const a = story.characters.find((c) => c.id === from)!;
   const b = story.characters.find((c) => c.id === to)!;
   const rel = relFor(story, from, to);
@@ -417,7 +690,11 @@ function RelEditor({ story, from, to, onSwitch, onClose }: { story: Story; from:
             className="btn small ghost danger"
             onClick={() => {
               if (!confirm(`Remove the relationship between ${a.name || 'them'} and ${b.name || 'them'}?`)) return;
-              upd((s) => void (s.relationships = s.relationships.filter((x) => !((x.from === from && x.to === to) || (x.from === to && x.to === from)))));
+              update((d) => {
+                const st = d.stories.find((x) => x.id === story.id) ?? d.universes.find((x) => x.id === story.id);
+                const ids = (st?.relationships ?? []).filter((x) => (x.from === from && x.to === to) || (x.from === to && x.to === from)).map((x) => x.id);
+                ids.forEach((id) => trashItem(d, story.id, 'relationships', id, `${a.name || '?'} & ${b.name || '?'}`));
+              });
               onClose();
             }}
           >

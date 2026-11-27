@@ -104,5 +104,7 @@ export function makeCache(userId: string): LocalCache {
     setUploaded: (v) => set(k('uploaded'), v),
     getImage: (h) => get('img:' + h),
     setImage: (h, v) => set('img:' + h, v),
+    getBase: (id) => get(k('base:' + id)),
+    setBase: (id, v) => set(k('base:' + id), v),
   };
 }

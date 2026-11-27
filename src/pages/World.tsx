@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
 import { useStory, type StoryUpdater } from '../store';
+import { useLibrary } from '../store';
+import { trashItem } from '../trash';
 import { Avatar, CharacterChips, DropZone, Empty, Field, ImagePick, Modal } from '../components/ui';
 import { AdjustButton, FramedImg } from '../components/Framed';
 import { QUESTION_BANK } from '../defaults';
@@ -182,6 +184,7 @@ function WikiHome({ w, onSelect }: { w: Story; onSelect: (id: string) => void })
 }
 
 function EntryPage({ w, wu, characters, entry, cats, onSelect }: WorldProps & { entry: LoreEntry; cats: string[]; onSelect: (id: string | null) => void }) {
+  const { update } = useLibrary();
   const i = w.lore.findIndex((e) => e.id === entry.id);
   const set = (fn: (e: LoreEntry) => void) => wu((s) => fn(s.lore[i]));
   const linked = entry.entryIds.map((id) => w.lore.find((e) => e.id === id)).filter((e): e is LoreEntry => !!e);
@@ -258,9 +261,9 @@ function EntryPage({ w, wu, characters, entry, cats, onSelect }: WorldProps & { 
         <button
           className="btn small ghost danger"
           onClick={() => {
-            if (!confirm(`Delete the page “${entry.name || 'Untitled'}”?`)) return;
+            if (!confirm(`Delete the page “${entry.name || 'Untitled'}”? It goes to the bin for 30 days.`)) return;
+            update((d) => trashItem(d, w.id, 'lore', entry.id, entry.name));
             wu((s) => {
-              s.lore.splice(i, 1);
               s.lore.forEach((e) => (e.entryIds = e.entryIds.filter((x) => x !== entry.id)));
               s.worldImages.forEach((img) => img.pins?.forEach((p) => p.entryId === entry.id && (p.entryId = undefined)));
             });
@@ -277,6 +280,7 @@ function EntryPage({ w, wu, characters, entry, cats, onSelect }: WorldProps & { 
 // ---------------------------------------------------------------- maps
 
 function Maps({ w, wu, onOpenEntry }: WorldProps & { onOpenEntry: (id: string) => void }) {
+  const { update } = useLibrary();
   const [open, setOpen] = useState<string | null>(null);
   const add = (srcs: string[]) => wu((s) => void s.worldImages.push(...srcs.map((src) => ({ id: uid(), src, title: '', caption: '', pins: [] }))));
   const img = w.worldImages.find((x) => x.id === open);
@@ -307,7 +311,7 @@ function Maps({ w, wu, onOpenEntry }: WorldProps & { onOpenEntry: (id: string) =
                   <button className="icon-btn" title="Move earlier" onClick={() => wu((s) => move(s.worldImages, i, i - 1))}>←</button>
                   <AdjustButton src={im.src} frame={im.frame} aspect={4 / 3} label="✥" className="icon-btn" onSave={(f) => wu((s) => void (s.worldImages[i].frame = f))} />
                   <ImagePick className="icon-btn" maxDim={2400} onPick={([src]) => wu((s) => { s.worldImages[i].src = src; s.worldImages[i].frame = undefined; })}>↻</ImagePick>
-                  <button className="icon-btn danger" title="Delete" onClick={() => confirm('Delete this image and its pins?') && wu((s) => void s.worldImages.splice(i, 1))}>🗑</button>
+                  <button className="icon-btn danger" title="Delete" onClick={() => confirm('Delete this picture and its pins? It goes to the bin for 30 days.') && update((d) => trashItem(d, w.id, 'worldImages', im.id, im.title || 'Picture'))}>🗑</button>
                 </div>
               </figcaption>
             </figure>
@@ -414,6 +418,7 @@ function MapViewer({ w, wu, img, onClose, onOpenEntry }: { w: Story; wu: StoryUp
 // ---------------------------------------------------------------- timeline
 
 function Timeline({ w, wu, characters }: WorldProps) {
+  const { update } = useLibrary();
   const [editing, setEditing] = useState<string | null>(null);
   const frozen = useRef<string[] | null>(null);
   // events with a number sort by it; the rest keep the order you made them.
@@ -480,7 +485,7 @@ function Timeline({ w, wu, characters }: WorldProps) {
                   )}
                   <div className="row end gap">
                     <button className="btn small ghost" onClick={() => setEditing(isEd ? null : e.id)}>{isEd ? 'Done' : 'Edit'}</button>
-                    <button className="icon-btn tiny danger" title="Delete event" onClick={() => confirm('Delete this event?') && wu((s) => void s.events.splice(i, 1))}>🗑</button>
+                    <button className="icon-btn tiny danger" title="Delete event" onClick={() => confirm('Delete this event?') && update((d) => trashItem(d, w.id, 'events', e.id))}>🗑</button>
                   </div>
                 </div>
               </li>
@@ -495,6 +500,7 @@ function Timeline({ w, wu, characters }: WorldProps) {
 // ---------------------------------------------------------------- glossary
 
 function Glossary({ w, wu }: WorldProps) {
+  const { update } = useLibrary();
   const [q, setQ] = useState('');
   const [fresh, setFresh] = useState<string | null>(null);
   const list = w.glossary
@@ -539,7 +545,7 @@ function Glossary({ w, wu }: WorldProps) {
                     <Field className="small muted-field" value={t.category} placeholder="category" onChange={(v) => wu((s) => void (s.glossary[i].category = v))} />
                   </div>
                   <Field multiline className="gloss-def" value={t.definition} placeholder="Meaning…" onChange={(v) => wu((s) => void (s.glossary[i].definition = v))} />
-                  <button className="icon-btn tiny danger" title="Delete term" onClick={() => wu((s) => void s.glossary.splice(i, 1))}>×</button>
+                  <button className="icon-btn tiny danger" title="Delete term" onClick={() => update((d) => trashItem(d, w.id, 'glossary', t.id))}>×</button>
                 </div>
               </div>
             );

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { produce, type Draft } from 'immer';
-import { getMany, setMany } from 'idb-keyval';
+import { get, getMany, setMany, update as idbUpdate } from 'idb-keyval';
+import { merge3 } from './merge';
 import type { Library, Story } from './types';
-import { emptyLibrary, normalizeLibrary } from './defaults';
+import { emptyLibrary, normalizeLibrary, TRASH_DAYS } from './defaults';
 import { docId } from './sync/engine';
 
 const KEY = 'writers-oatmeal-library';
@@ -29,9 +30,9 @@ const LibraryContext = createContext<Ctx | null>(null);
  */
 function stamp(prev: Library, next: Library): Library {
   const now = Date.now();
-  const touched: [('stories' | 'universes' | 'chapters'), string][] = [];
+  const touched: [('stories' | 'universes' | 'chapters' | 'trash'), string][] = [];
   const removed: string[] = [];
-  for (const [key, kind] of [['stories', 'story'], ['universes', 'universe'], ['chapters', 'chapter']] as const) {
+  for (const [key, kind] of [['stories', 'story'], ['universes', 'universe'], ['chapters', 'chapter'], ['trash', 'trash']] as const) {
     const prevList: { id: string; updatedAt: number }[] = prev[key];
     const nextList: { id: string; updatedAt: number }[] = next[key];
     const before = new Map(prevList.map((x) => [x.id, x]));
@@ -55,6 +56,8 @@ function stamp(prev: Library, next: Library): Library {
 }
 
 const KEY_AT = KEY + ':savedAt';
+/** identifies this tab when several are open */
+const TAB_ID = Math.random().toString(36).slice(2);
 const UNSAVED = 'wo-unsaved-changes';
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
@@ -65,6 +68,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const latest = useRef<Library | null>(null);
   /** the version waiting to be written (null = everything is safely stored) */
   const dirty = useRef<Library | null>(null);
+  /** what this tab knows is on disk: the common starting point when another tab saves */
+  const base = useRef<Library | null>(null);
+  /** a library adopted from another tab (already on disk: don't save it again) */
+  const adopted = useRef<Library | null>(null);
+  const channel = useRef<BroadcastChannel | null>(null);
+  /** when the copy on disk that this tab last saw was written */
+  const knownAt = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -73,7 +83,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       try {
         const [v, at] = await getMany([KEY, KEY_AT]);
         stored = normalizeLibrary(v);
-        storedAt = typeof at === 'number' ? at : 0;
+        storedAt = (v as Library | undefined)?.savedAt ?? (typeof at === 'number' ? at : 0);
+        knownAt.current = storedAt;
       } catch {
         /* fall through to an empty library */
       }
@@ -93,8 +104,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         // write them properly now
         latest.current = null;
         setLib(rescued);
+        base.current = rescued;
         setMany([[KEY, rescued], [KEY_AT, Date.now()]]).catch(() => {});
-      } else setLib(stored ?? emptyLibrary());
+      } else {
+        const l = stored ?? emptyLibrary();
+        base.current = l;
+        setLib(l);
+      }
     })();
     // Ask the browser not to evict our data under storage pressure.
     navigator.storage?.persist?.().catch(() => {});
@@ -106,8 +122,33 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     clearTimeout(timer.current);
     lastWrite.current = Date.now();
     try {
-      await setMany([[KEY, snapshot], [KEY_AT, Date.now()]]);
+      // Read, combine and write in one step: if another tab saved since we last
+      // looked, merge its changes in rather than writing over them.
+      const now = Date.now();
+      let written: Library = snapshot;
+      await idbUpdate(KEY, (old: unknown) => {
+        const disk = old as Library | undefined;
+        if (disk && (disk.savedAt ?? 0) > knownAt.current && base.current) {
+          const theirs = normalizeLibrary(disk);
+          if (theirs) written = merge3(base.current, snapshot, theirs, 'a').value;
+        }
+        written = { ...written, savedAt: now };
+        return written;
+      });
+      await setMany([[KEY_AT, now]]);
+      knownAt.current = now;
+      base.current = written;
+      channel.current?.postMessage({ type: 'saved', from: TAB_ID, at: now });
       if (dirty.current === snapshot) dirty.current = null;
+      // show the combined version (keeping anything typed while we were saving)
+      setLib((cur) => {
+        if (!cur) return cur;
+        if (cur === snapshot) {
+          adopted.current = written;
+          return written;
+        }
+        return merge3(snapshot, cur, written, 'a').value;
+      });
       setSaveState(dirty.current ? 'saving' : 'saved');
     } catch {
       setSaveState('error');
@@ -131,6 +172,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!lib) return;
+    if (lib === adopted.current) {
+      // came from another tab and is already stored
+      latest.current = lib;
+      return;
+    }
     if (latest.current === null) {
       latest.current = lib;
       return;
@@ -158,7 +204,52 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     };
   }, [rescue]);
 
+  // ---- several tabs open: when another tab saves, bring its changes in here
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel('writers-oatmeal-library');
+    channel.current = ch;
+    let t: number | undefined;
+    ch.onmessage = (e) => {
+      if (e.data?.type !== 'saved' || e.data.from === TAB_ID) return;
+      clearTimeout(t);
+      t = window.setTimeout(async () => {
+        const disk = (await get(KEY).catch(() => null)) as Library | null;
+        const theirs = normalizeLibrary(disk);
+        if (!theirs || (disk?.savedAt ?? 0) <= knownAt.current) return; // nothing newer than what we have
+        knownAt.current = disk?.savedAt ?? Date.now();
+        const mine = latest.current;
+        if (!mine || !dirty.current || !base.current) {
+          // nothing unsaved here: just show what the other tab saved
+          adopted.current = theirs;
+          base.current = theirs;
+          setLib(theirs);
+          return;
+        }
+        // both tabs changed things: combine them (this tab's version wins a true clash)
+        const merged = merge3(base.current, mine, theirs, 'a').value;
+        base.current = theirs;
+        setLib(merged);
+      }, 250);
+    };
+    return () => {
+      clearTimeout(t);
+      ch.close();
+      channel.current = null;
+    };
+  }, []);
+
   const update = useCallback((fn: LibUpdater) => setLib((prev) => (prev ? stamp(prev, produce(prev, fn)) : prev)), []);
+
+  // empty the bin of anything older than 30 days (as a normal deletion, so it syncs)
+  const loaded = !!lib;
+  useEffect(() => {
+    if (!loaded) return;
+    update((d) => {
+      const keep = d.trash.filter((t) => Date.now() - t.deletedAt < TRASH_DAYS * 864e5);
+      if (keep.length !== d.trash.length) d.trash = keep;
+    });
+  }, [loaded, update]);
   const replace = useCallback((l: Library) => setLib((prev) => (prev ? stamp(prev, l) : l)), []);
   const applyRemote = useCallback((fn: (l: Library) => Library) => setLib((prev) => (prev ? fn(prev) : prev)), []);
 

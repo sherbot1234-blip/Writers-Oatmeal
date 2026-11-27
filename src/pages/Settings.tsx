@@ -9,7 +9,7 @@ import { download, ensureFonts, FONT_OPTIONS, fontStack, move, slug, uid } from 
 import type { Palette, Theme } from '../types';
 import { CARD_STYLES, makePage, ORNAMENTS, PAGE_TEMPLATES, STYLE_PACKS, TEXTURES } from '../packs';
 import { palette, themeVars } from './Library';
-import { deleteUniverse } from '../universe';
+import { trashItem, trashStory, trashUniverse } from '../trash';
 
 const COLOR_FIELDS: { key: keyof Palette; label: string }[] = [
   { key: 'bg', label: 'Background' },
@@ -231,7 +231,7 @@ export default function Settings() {
             <button
               className="icon-btn danger"
               title="Delete page"
-              onClick={() => confirm(`Delete the page “${pg.title}” and everything on it?`) && upd((s) => void s.customPages.splice(i, 1))}
+              onClick={() => confirm(`Delete the page “${pg.title}”? It goes to the bin for 30 days.`) && update((d) => trashItem(d, story.id, 'customPages', pg.id, pg.title))}
             >
               🗑
             </button>
@@ -294,16 +294,13 @@ export default function Settings() {
             className="btn danger"
             onClick={() => {
               const msg = isUniverse
-                ? `Delete the universe “${story.title}”? Its stories are kept, and each keeps its own copy of the shared characters it uses.`
-                : `Delete “${story.title}” and all its chapters forever? Export it first if you might want it back.`;
+                ? `Delete the universe “${story.title}”? Its stories are kept, and each keeps its own copy of the shared characters it uses. The universe goes to the bin for 30 days.`
+                : `Delete “${story.title}” and all its chapters? It goes to the bin for 30 days, so you can restore it.`;
               if (!confirm(msg)) return;
               nav('/');
               update((d) => {
-                if (isUniverse) deleteUniverse(d, story.id);
-                else {
-                  d.stories = d.stories.filter((s) => s.id !== story.id);
-                  d.chapters = d.chapters.filter((c) => c.storyId !== story.id);
-                }
+                if (isUniverse) trashUniverse(d, story.id);
+                else trashStory(d, story.id);
               });
             }}
           >

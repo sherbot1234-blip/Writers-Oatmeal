@@ -6,10 +6,12 @@ import { Avatar, CharacterChips, Empty, Field, Modal } from '../components/ui';
 import { MiniSongs, newSong, Player } from '../components/Music';
 import { move, parseMedia } from '../util';
 import * as sp from '../spotify';
+import { trashItem } from '../trash';
 import { useLibrary } from '../store';
 import type { Chapter, Song, Story } from '../types';
 
 export default function Songs() {
+  const { update } = useLibrary();
   const { story, upd, base } = useStoryCtx();
   const { chapters } = useChapters(story.id);
   const [editing, setEditing] = useState<string | null>(null);
@@ -184,7 +186,7 @@ export default function Songs() {
                     <div className="row">
                       <button className="icon-btn" title="Move up" onClick={() => upd((s) => move(s.songs, i, i - 1))}>↑</button>
                       <button className="icon-btn" title="Move down" onClick={() => upd((s) => move(s.songs, i, i + 1))}>↓</button>
-                      <button className="icon-btn danger" title="Delete" onClick={() => confirm('Delete this song?') && upd((s) => void s.songs.splice(i, 1))}>🗑</button>
+                      <button className="icon-btn danger" title="Delete" onClick={() => confirm('Delete this song? It goes to the bin for 30 days.') && update((d) => trashItem(d, story.id, 'songs', song.id))}>🗑</button>
                     </div>
                   </div>
                 </div>

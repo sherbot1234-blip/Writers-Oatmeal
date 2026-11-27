@@ -11,11 +11,12 @@
  * bucket, keyed by content hash) and put back as data URLs on download, so the
  * rest of the app only ever sees plain data URLs.
  */
-import type { Chapter, Library, Story } from '../types';
-import { normalizeChapter, normalizeStory } from '../defaults';
+import type { Chapter, Library, Story, TrashItem } from '../types';
+import { normalizeChapter, normalizeStory, normalizeTrash } from '../defaults';
+import { merge3 } from '../merge';
 
 /** Anything synced as its own document. */
-type Entity = Story | Chapter;
+type Entity = Story | Chapter | TrashItem;
 import { uid } from '../util';
 
 export const META_ID = '__meta';
@@ -46,21 +47,28 @@ export interface LocalCache {
   setUploaded(v: string[]): Promise<void>;
   getImage(hash: string): Promise<string | undefined>;
   setImage(hash: string, dataUrl: string): Promise<void>;
+  /** the version both sides last agreed on (as stored in the cloud), used to merge edits */
+  getBase(docId: string): Promise<unknown>;
+  setBase(docId: string, data: unknown): Promise<void>;
 }
 
-export type Kind = 'story' | 'universe' | 'chapter';
-type Coll = 'stories' | 'universes' | 'chapters';
-const coll = (k: Kind): Coll => (k === 'universe' ? 'universes' : k === 'chapter' ? 'chapters' : 'stories');
+export type Kind = 'story' | 'universe' | 'chapter' | 'trash';
+type Coll = 'stories' | 'universes' | 'chapters' | 'trash';
+const coll = (k: Kind): Coll => (k === 'universe' ? 'universes' : k === 'chapter' ? 'chapters' : k === 'trash' ? 'trash' : 'stories');
 /** Remote/tombstone id: stories keep their id (backwards compatible), universes get a prefix. */
-export const docId = (k: Kind, id: string) => (k === 'universe' ? 'u:' + id : k === 'chapter' ? 'c:' + id : id);
+const PREFIX: Record<Kind, string> = { story: '', universe: 'u:', chapter: 'c:', trash: 't:' };
+export const docId = (k: Kind, id: string) => PREFIX[k] + id;
 const parseDocId = (d: string): [Kind, string] =>
-  d.startsWith('u:') ? ['universe', d.slice(2)] : d.startsWith('c:') ? ['chapter', d.slice(2)] : ['story', d];
+  d.startsWith('u:') ? ['universe', d.slice(2)] : d.startsWith('c:') ? ['chapter', d.slice(2)] : d.startsWith('t:') ? ['trash', d.slice(2)] : ['story', d];
 
 export interface Changes {
   /** Stories/universes to put into the library, with the local version they're allowed to replace. */
-  upserts: { kind: Kind; story: Entity; ifLocalVersion: number | undefined }[];
+  /** `snapshot`: the local copy when this sync started, so edits made meanwhile can be merged in rather than lost */
+  upserts: { kind: Kind; story: Entity; ifLocalVersion: number | undefined; snapshot?: Entity }[];
   removes: { kind: Kind; id: string; ifLocalVersion: number | undefined }[];
   conflictCopies: { kind: Kind; story: Entity }[];
+  /** versions that lost a true clash during a merge: kept in the bin */
+  newTrash: TrashItem[];
   meta?: { siteTitle: string; metaUpdatedAt: number; ifLocalVersion: number };
 }
 
@@ -154,12 +162,14 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
     ...lib.stories.map((s) => [docId('story', s.id), s] as const),
     ...(lib.universes ?? []).map((u) => [docId('universe', u.id), u] as const),
     ...(lib.chapters ?? []).map((c) => [docId('chapter', c.id), c] as const),
+    ...(lib.trash ?? []).map((t) => [docId('trash', t.id), t] as const),
   ]);
   const tomb = lib.tombstones ?? {};
 
-  const changes: Changes = { upserts: [], removes: [], conflictCopies: [] };
+  const changes: Changes = { upserts: [], removes: [], conflictCopies: [], newTrash: [] };
   const toPush: { id: string; story?: Entity; version: number }[] = [];
   const toPull: string[] = [];
+  const toMerge: string[] = [];
   let conflicts = 0;
 
   const ids = new Set<string>([...local.keys(), ...Object.keys(tomb), ...remote.keys()]);
@@ -194,12 +204,7 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
       else if (R.deleted && L) toPush.push({ id, story: L, version: L.updatedAt }); // edited here after deletion elsewhere: keep it
       else if (!L) toPull.push(id); // deleted here, edited elsewhere: bring it back
       else if (R.updated_at === L.updatedAt) synced[id] = R.updated_at;
-      else {
-        toPull.push(id);
-        conflicts++;
-        const stamp = new Date(L.updatedAt).toLocaleString();
-        changes.conflictCopies.push({ kind, story: { ...L, id: uid(), title: `${L.title} (conflict copy, ${stamp})` } });
-      }
+      else toMerge.push(id); // changed on both: combine the two
     }
   }
 
@@ -214,32 +219,66 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
   else if (metaRemoteChanged && (!metaLocalChanged || rMeta.updated_at > lMetaVer)) toPull.push(META_ID);
   else if (metaLocalChanged) pushMeta = true;
 
-  // ---- pull ----
-  if (toPull.length) {
-    const docs = await backend.fetch(toPull);
+  const toEntity = (kind: Kind, realId: string, data: unknown, version: number): Entity => {
+    let e: Entity;
+    if (kind === 'chapter') e = normalizeChapter(data as Partial<Chapter>);
+    else if (kind === 'trash') e = normalizeTrash(data as Partial<TrashItem>);
+    else {
+      e = normalizeStory(data as Partial<Story>);
+      (e as Story).kind = kind;
+    }
+    e.id = realId;
+    e.updatedAt = version;
+    return e;
+  };
+  const rows: RemoteDoc[] = [];
+
+  // ---- pull (and merge what changed on both sides) ----
+  if (toPull.length || toMerge.length) {
+    const docs = await backend.fetch([...toPull, ...toMerge]);
     for (const d of docs) {
+      if (toMerge.includes(d.id)) {
+        const [kind, realId] = parseDocId(d.id);
+        const L = local.get(d.id)!;
+        const prefer = L.updatedAt >= d.updated_at ? 'a' : 'b'; // the newer edit wins a true clash
+        const mine = await extractImages(L, backend, cache, uploaded);
+        const base = await cache.getBase(d.id);
+        const { value, conflicts: clashes } = base !== undefined ? merge3(base, mine, d.data, prefer) : { value: prefer === 'a' ? mine : d.data, conflicts: ['(no common version)'] };
+        const version = Math.max(L.updatedAt, d.updated_at) + 1;
+        if (clashes.length) {
+          conflicts++;
+          // keep the version that lost, so nothing is ever thrown away
+          const loser = prefer === 'a' ? toEntity(kind, realId, await restoreImages(d.data, backend, cache, uploaded), d.updated_at) : L;
+          changes.newTrash.push({
+            id: uid(),
+            kind: 'version',
+            title: (loser as Story).title || 'Untitled',
+            what: kind === 'chapter' ? 'Older chapter version' : kind === 'trash' ? 'Older bin item' : 'Older version',
+            storyId: kind === 'chapter' ? (loser as Chapter).storyId : realId,
+            deletedAt: Date.now(),
+            updatedAt: Date.now(),
+            payload: { kind, data: loser },
+          });
+        }
+        rows.push({ id: d.id, updated_at: version, deleted: false, data: value });
+        const merged = toEntity(kind, realId, await restoreImages(value, backend, cache, uploaded), version);
+        changes.upserts.push({ kind, story: merged, ifLocalVersion: L.updatedAt, snapshot: L });
+        continue;
+      }
       if (d.id === META_ID) {
         const m = (d.data ?? {}) as { siteTitle?: string };
         changes.meta = { siteTitle: m.siteTitle || lib.siteTitle, metaUpdatedAt: d.updated_at, ifLocalVersion: lMetaVer };
       } else {
         const [kind, realId] = parseDocId(d.id);
-        const data = await restoreImages(d.data, backend, cache, uploaded);
-        let story: Entity;
-        if (kind === 'chapter') story = normalizeChapter(data as Partial<Chapter>);
-        else {
-          story = normalizeStory(data as Partial<Story>);
-          story.kind = kind;
-        }
-        story.id = realId;
-        story.updatedAt = d.updated_at;
-        changes.upserts.push({ kind, story, ifLocalVersion: local.get(d.id)?.updatedAt });
+        const story = toEntity(kind, realId, await restoreImages(d.data, backend, cache, uploaded), d.updated_at);
+        changes.upserts.push({ kind, story, ifLocalVersion: local.get(d.id)?.updatedAt, snapshot: local.get(d.id) });
+        await cache.setBase(d.id, d.data);
       }
       synced[d.id] = d.updated_at;
     }
   }
 
   // ---- push ----
-  const rows: RemoteDoc[] = [];
   for (const p of toPush) {
     if (p.story) rows.push({ id: p.id, updated_at: p.version, deleted: false, data: await extractImages(p.story, backend, cache, uploaded) });
     else rows.push({ id: p.id, updated_at: p.version, deleted: true, data: null });
@@ -247,7 +286,10 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
   if (pushMeta) rows.push({ id: META_ID, updated_at: lMetaVer, deleted: false, data: { siteTitle: lib.siteTitle } });
   // upload in small batches so one huge story doesn't time out the rest
   for (let i = 0; i < rows.length; i += 5) await backend.upsert(rows.slice(i, i + 5));
-  for (const r of rows) synced[r.id] = r.updated_at;
+  for (const r of rows) {
+    synced[r.id] = r.updated_at;
+    if (r.id !== META_ID && !r.deleted) await cache.setBase(r.id, r.data);
+  }
 
   await cache.setUploaded([...uploaded]);
   await cache.setSynced(synced);
@@ -256,13 +298,20 @@ export async function runSync(lib: Library, backend: Backend, cache: LocalCache)
 
 /** Applies remote changes to the newest local library, skipping anything edited locally meanwhile. */
 export function applyChanges(lib: Library, c: Changes): Library {
-  const next: Library = { ...lib, stories: [...lib.stories], universes: [...(lib.universes ?? [])], chapters: [...(lib.chapters ?? [])] };
+  const next: Library = { ...lib, stories: [...lib.stories], universes: [...(lib.universes ?? [])], chapters: [...(lib.chapters ?? [])], trash: [...(lib.trash ?? [])] };
   const list = (k: Kind) => next[coll(k)] as Entity[];
   for (const u of c.upserts) {
     const arr = list(u.kind);
     const i = arr.findIndex((s) => s.id === u.story.id);
     if (i >= 0) {
       if (arr[i].updatedAt === u.ifLocalVersion) arr[i] = u.story;
+      else if (u.snapshot) {
+        // you edited it while the sync was running: keep those edits on top of what arrived
+        const cur = arr[i];
+        const merged = merge3(u.snapshot, cur, u.story, 'a').value as Entity;
+        merged.updatedAt = cur.updatedAt + 1;
+        arr[i] = merged;
+      }
     } else if (u.ifLocalVersion === undefined) arr.push(u.story);
   }
   for (const r of c.removes) {
@@ -270,6 +319,7 @@ export function applyChanges(lib: Library, c: Changes): Library {
     (next as any)[k] = list(r.kind).filter((s) => !(s.id === r.id && s.updatedAt === r.ifLocalVersion));
   }
   for (const cc of c.conflictCopies) list(cc.kind).push(cc.story);
+  next.trash.push(...(c.newTrash ?? []));
   if (c.meta && (lib.metaUpdatedAt ?? 0) === c.meta.ifLocalVersion) {
     next.siteTitle = c.meta.siteTitle;
     next.metaUpdatedAt = c.meta.metaUpdatedAt;
@@ -278,5 +328,5 @@ export function applyChanges(lib: Library, c: Changes): Library {
 }
 
 export function hasChanges(c: Changes) {
-  return c.upserts.length + c.removes.length + c.conflictCopies.length > 0 || !!c.meta;
+  return c.upserts.length + c.removes.length + c.conflictCopies.length + (c.newTrash?.length ?? 0) > 0 || !!c.meta;
 }

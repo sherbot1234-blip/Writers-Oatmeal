@@ -402,6 +402,10 @@ export interface Story {
   relTypes: RelType[];
   relationships: Relationship[];
   charCategories: CharCategory[];
+  /** characters who get their own relationship chart, in order */
+  relPovs: string[];
+  /** POV character id → where people sit on their chart */
+  relCharts: Record<string, ChartSpot[]>;
   /** character id → category ids (kept on the story so shared universe characters can be grouped differently per book) */
   charCategoryMap: Record<string, string[]>;
   trees: FamilyTree[];
@@ -430,8 +434,37 @@ export interface Library {
   stories: Story[];
   universes: Story[];
   chapters: Chapter[];
+  /** Recently deleted things, kept 30 days so they can be restored. */
+  trash: TrashItem[];
+  /** when this copy was written to the browser's storage (to spot newer saves from other tabs) */
+  savedAt?: number;
   /** When siteTitle (and future library settings) last changed — used by sync. */
   metaUpdatedAt: number;
   /** Deleted story id → when it was deleted, so deletions sync to other devices. */
   tombstones: Record<string, number>;
+}
+
+export type TrashKind = 'story' | 'universe' | 'character' | 'chapter' | 'item' | 'version';
+
+/** Something deleted (or an older version replaced during sync), kept for 30 days. */
+export interface TrashItem {
+  id: string;
+  kind: TrashKind;
+  /** its name, e.g. "Ava" */
+  title: string;
+  /** what sort of thing it is, e.g. "Character", "Plot point" */
+  what: string;
+  storyId?: string;
+  storyTitle?: string;
+  deletedAt: number;
+  updatedAt: number;
+  /** everything needed to put it back */
+  payload: any;
+}
+
+/** Where a person sits on one POV character's relationship chart. */
+export interface ChartSpot {
+  charId: string;
+  x: number;
+  y: number;
 }

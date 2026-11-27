@@ -8,6 +8,8 @@ import type { Story, StoryStatus, Theme } from '../types';
 import { pathFor } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
 import { OatLogo } from '../components/Logo';
+import { BinButton } from '../components/Bin';
+import { trashStory } from '../trash';
 import { FramedImg } from '../components/Framed';
 
 /** The colours in use right now: the main palette, or the second mood if it's switched on. */
@@ -70,6 +72,9 @@ export default function LibraryPage() {
   const [statuses, setStatuses] = useState<StoryStatus[]>([]);
   const [view, setView] = useState<ViewMode>(() => pref('wo-shelf-view', 'spines'));
   const [sort, setSort] = useState<SortMode>(() => pref('wo-shelf-sort', 'series'));
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   useEffect(() => {
     document.body.style.background = '';
@@ -192,6 +197,7 @@ export default function LibraryPage() {
         </div>
         <div className="row gap wrap">
           <CloudButton />
+          <BinButton />
           <button className="btn ghost" onClick={importFile}>Import</button>
           <button className="btn ghost" onClick={() => download(`writers-oatmeal-backup-${new Date().toISOString().slice(0, 10)}.json`, lib)} disabled={!total && !lib.universes.length}>
             Back up all
@@ -215,6 +221,28 @@ export default function LibraryPage() {
         </div>
       ) : (
         <>
+          {selecting && (
+            <div className="select-bar card">
+              <b>{picked.length} selected</b>
+              <span className="muted small">Click books to tick them.</span>
+              <span style={{ flex: 1 }} />
+              <button className="btn small ghost" onClick={() => setPicked(lib.stories.map((x) => x.id))}>Select all</button>
+              <button
+                className="btn small danger"
+                disabled={!picked.length}
+                onClick={() => {
+                  const names = lib.stories.filter((x) => picked.includes(x.id)).map((x) => `• ${x.title || 'Untitled'}`).join('\n');
+                  if (!confirm(`Delete ${picked.length} ${picked.length === 1 ? 'story' : 'stories'}? They go to the bin for 30 days.\n\n${names}`)) return;
+                  update((d) => picked.forEach((id) => trashStory(d, id)));
+                  setPicked([]);
+                  setSelecting(false);
+                }}
+              >
+                🗑 Delete {picked.length || ''}
+              </button>
+              <button className="btn small" onClick={() => { setSelecting(false); setPicked([]); }}>Done</button>
+            </div>
+          )}
           <div className="shelf-tools">
             <input className="input search" type="search" placeholder="Search titles, genres, characters…" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="chip-row">
@@ -241,6 +269,7 @@ export default function LibraryPage() {
                 <option value="title">Title A–Z</option>
                 <option value="status">Status</option>
               </select>
+              {!selecting && <button className="btn small ghost" onClick={() => setSelecting(true)} title="Tick several stories to delete them at once">☑ Select</button>}
               <div className="seg">
                 {(['spines', 'covers'] as const).map((v) => (
                   <button key={v} className={view === v ? 'on' : ''} onClick={() => { setView(v); savePref('wo-shelf-view', v); }}>
@@ -267,9 +296,20 @@ export default function LibraryPage() {
               </div>
               <div className={'books ' + view}>
                 {sh.books.map((s) => (
-                  <span key={s.id} className="book-wrap">
+                  <span
+                    key={s.id}
+                    className={'book-wrap' + (selecting ? ' selecting' : '') + (picked.includes(s.id) ? ' picked' : '')}
+                    onClickCapture={(e) => {
+                      if (!selecting) return;
+                      // in Select mode, clicking a book ticks it instead of opening it
+                      e.preventDefault();
+                      e.stopPropagation();
+                      togglePick(s.id);
+                    }}
+                  >
                     {view === 'spines' ? <Spine s={s} seriesNo={sh.universe && sort === 'series' ? s.seriesOrder : undefined} /> : <Cover s={s} />}
-                    {s.milanoteUrl && (
+                    {selecting && <span className="pick-box" aria-hidden>{picked.includes(s.id) ? '✓' : ''}</span>}
+                    {!selecting && s.milanoteUrl && (
                       <a className="book-board" href={s.milanoteUrl} target="_blank" rel="noreferrer" title="Open Milanote board" aria-label={`Milanote board for ${s.title}`}>📌</a>
                     )}
                   </span>

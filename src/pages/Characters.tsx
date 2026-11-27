@@ -8,6 +8,8 @@ import { cloneSectionShape, defaultCharacterTemplate } from '../defaults';
 import { move, SWATCHES, uid } from '../util';
 import type { Character, Story } from '../types';
 import { catsOf, groupCharacters } from '../categories';
+import { trashCharacter } from '../trash';
+import { MergeCharacters } from '../components/MergeCharacters';
 import { useLibrary } from '../store';
 import { includeShared } from '../universe';
 
@@ -33,6 +35,11 @@ export default function Characters() {
   const [tab, setTab] = useState<string>('all');
   const [catsOpen, setCatsOpen] = useState(false);
   const [tagging, setTagging] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [merging, setMerging] = useState<[string, string] | null>(null);
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const ownIds = new Set(story.characters.filter((c) => !sharedIds.has(c.id)).map((c) => c.id));
   const cats = story.charCategories;
   const groups = groupCharacters(story, story.characters);
   const hasLoose = groups.some((g) => !g.cat);
@@ -72,11 +79,18 @@ export default function Characters() {
         return (
           <DropZone
             key={c.id}
-            className="char-card card"
+            className={'char-card card' + (selecting ? ' selecting' : '') + (picked.includes(c.id) ? ' picked' : '')}
             style={{ borderTopColor: c.color }}
+            onClickCapture={(e) => {
+              if (!selecting) return;
+              e.preventDefault();
+              e.stopPropagation();
+              togglePick(c.id);
+            }}
             label={`Drop a picture of ${c.name || 'them'}`}
             onPick={([src]) => upd((s) => { const x = s.characters.find((y) => y.id === c.id); if (x) { x.image = src; x.imageFrame = undefined; } })}
           >
+            {selecting && <span className="pick-box" aria-hidden>{picked.includes(c.id) ? '✓' : ''}</span>}
             <Link to={`${base}/characters/${c.id}`} className="char-card-link">
               <div className="char-card-img" style={{ background: c.color + '33' }}>
                 {c.image ? <FramedImg src={c.image} frame={c.imageFrame} className="fill" /> : <Avatar c={c} size={72} />}
@@ -127,6 +141,7 @@ export default function Characters() {
       <div className="page-head">
         <h1>{story.kind === 'universe' ? 'Shared cast' : 'Characters'}</h1>
         <div className="row gap wrap">
+          {!selecting && story.characters.length > 1 && <button className="btn ghost" onClick={() => setSelecting(true)} title="Tick several characters to delete or merge them">☑ Select</button>}
           <button className="btn ghost" onClick={() => setCatsOpen(true)}>🏷 Categories</button>
           <button className="btn ghost" onClick={() => setTemplateOpen(true)}>Card layout</button>
           {universe && (
@@ -138,6 +153,44 @@ export default function Characters() {
         </div>
       </div>
 
+      {selecting && (
+        <div className="select-bar card">
+          <b>{picked.length} selected</b>
+          <span className="muted small">Click characters to tick them. Tick two duplicates to merge them.</span>
+          <span style={{ flex: 1 }} />
+          <button
+            className="btn small"
+            disabled={picked.length !== 2 || !picked.every((id) => ownIds.has(id))}
+            title={picked.length !== 2 ? 'Tick exactly two characters' : !picked.every((id) => ownIds.has(id)) ? 'Shared universe characters are merged on the universe page' : 'Combine two duplicates into one'}
+            onClick={() => setMerging([picked[0], picked[1]])}
+          >
+            ⇄ Merge 2
+          </button>
+          <button
+            className="btn small danger"
+            disabled={!picked.length}
+            onClick={() => {
+              const shared = picked.filter((id) => sharedIds.has(id));
+              const own = picked.filter((id) => !sharedIds.has(id));
+              const names = story.characters.filter((c) => picked.includes(c.id)).map((c) => `• ${c.name || 'Unnamed'}`).join('\n');
+              if (!confirm(`Delete ${picked.length} ${picked.length === 1 ? 'character' : 'characters'}? They go to the bin for 30 days.${shared.length ? ' Shared universe characters are only removed from this story.' : ''}\n\n${names}`)) return;
+              update((d) => {
+                own.forEach((id) => trashCharacter(d, story.id, id));
+                const s = d.stories.find((x) => x.id === story.id);
+                if (s && shared.length) {
+                  s.sharedCharacterIds = s.sharedCharacterIds.filter((x) => !shared.includes(x));
+                  s.relationships = s.relationships.filter((r) => !shared.includes(r.from) && !shared.includes(r.to));
+                }
+              });
+              setPicked([]);
+              setSelecting(false);
+            }}
+          >
+            🗑 Delete {picked.length || ''}
+          </button>
+          <button className="btn small" onClick={() => { setSelecting(false); setPicked([]); }}>Done</button>
+        </div>
+      )}
       {story.kind === 'universe' && (
         <p className="muted small">
           Characters here can appear in any story in this universe. Edit them once and every story sees the change. In a story, use <b>🌌 Add from universe</b> to bring them in.
@@ -182,6 +235,19 @@ export default function Characters() {
       )}
 
       {catsOpen && <CategoriesEditor story={story} onClose={() => setCatsOpen(false)} />}
+      {merging && (
+        <MergeCharacters
+          story={story}
+          a={merging[0]}
+          b={merging[1]}
+          onClose={() => setMerging(null)}
+          onDone={() => {
+            setMerging(null);
+            setPicked([]);
+            setSelecting(false);
+          }}
+        />
+      )}
 
       {picking && universe && (
         <Modal title={`Add characters from ${universe.title || 'the universe'}`} onClose={() => setPicking(false)}>

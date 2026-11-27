@@ -171,6 +171,7 @@ export function DropZone({
   style,
   label,
   children,
+  onClickCapture,
 }: {
   onPick: (srcs: string[]) => void;
   multiple?: boolean;
@@ -179,10 +180,11 @@ export function DropZone({
   style?: CSSProperties;
   label?: string;
   children?: ReactNode;
+  onClickCapture?: (e: React.MouseEvent) => void;
 }) {
   const { over, busy, handlers } = useImageDrop(onPick, multiple, maxDim);
   return (
-    <div className={'dropzone ' + className + (over ? ' over' : '')} style={style} {...handlers}>
+    <div className={'dropzone ' + className + (over ? ' over' : '')} style={style} onClickCapture={onClickCapture} {...handlers}>
       {children}
       {(over || busy) && <div className="drop-overlay">{busy ? 'Adding…' : label ?? (multiple ? 'Drop pictures here' : 'Drop picture here')}</div>}
     </div>

@@ -7,6 +7,7 @@ import type { TabKey } from '../types';
 import { pathFor, type StoryCtx } from '../storyContext';
 import { CloudButton } from '../sync/Cloud';
 import { FramedImg } from '../components/Framed';
+import { BinButton } from '../components/Bin';
 
 const TAB_ICONS: Record<TabKey, string> = {
   overview: '📖',
@@ -87,6 +88,7 @@ export default function StoryLayout() {
             {t.mood === 'alt' ? '🌙' : '☀️'} <span className="mood-label">{t.mood === 'alt' ? t.altName : t.mainName}</span>
           </button>
         )}
+        <BinButton storyId={story.id} className="mood-btn" compact />
         <CloudButton />
       </header>
       <nav className="tabs">
