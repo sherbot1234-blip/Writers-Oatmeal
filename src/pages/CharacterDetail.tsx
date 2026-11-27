@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { pathFor, useStoryCtx } from '../storyContext';
 import { useLibrary } from '../store';
-import { deleteUniverseCharacter, shareCharacter, storiesUsing } from '../universe';
+import { trashCharacter } from '../trash';
+import { shareCharacter, storiesUsing } from '../universe';
 import { Avatar, ColorPick, DropZone, Field, ImagePick, Lightbox } from '../components/ui';
 import { AdjustButton, FramedImg } from '../components/Framed';
 import { SectionList } from '../components/Sections';
@@ -209,7 +210,7 @@ export default function CharacterDetail() {
                       onClick={() => {
                         const n = usedIn.length;
                         if (!confirm(`Delete ${c.name || 'this character'} everywhere?${n ? ` They'll disappear from ${n} ${n === 1 ? 'story' : 'stories'}.` : ''}`)) return;
-                        update((d) => deleteUniverseCharacter(d, story.id, c.id));
+                        update((d) => trashCharacter(d, story.id, c.id));
                         nav(base + '/characters');
                       }}
                     >
@@ -219,11 +220,8 @@ export default function CharacterDetail() {
                   {!isShared && story.kind !== 'universe' && <button
                     className="danger"
                     onClick={() => {
-                      if (!confirm(`Delete ${c.name || 'this character'}? Their relationships will be deleted too.`)) return;
-                      upd((s) => {
-                        s.characters.splice(idx, 1);
-                        s.relationships = s.relationships.filter((r) => r.from !== c.id && r.to !== c.id);
-                      });
+                      if (!confirm(`Delete ${c.name || 'this character'}? They (and their relationships) go to the bin for 30 days.`)) return;
+                      update((d) => trashCharacter(d, story.id, c.id));
                       nav(base + '/characters');
                     }}
                   >

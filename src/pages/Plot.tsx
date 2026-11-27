@@ -3,6 +3,8 @@ import { useStoryCtx } from '../storyContext';
 import { Link } from 'react-router-dom';
 import { Avatar, CharacterChips, ColorPick, Empty, Field, Modal } from '../components/ui';
 import { useChapters } from '../chapters';
+import { trashItem, trashPlotPoint } from '../trash';
+import { useLibrary } from '../store';
 import { makeStructure, STRUCTURES } from '../defaults';
 import { move, SWATCHES, uid } from '../util';
 import type { Beat, Chapter, PlotPoint, PlotStatus, Story } from '../types';
@@ -16,6 +18,7 @@ const STATUS: { key: PlotStatus; label: string; icon: string }[] = [
 type Drag = { arc: number; point: number } | null;
 
 export default function Plot() {
+  const { update } = useLibrary();
   const { story, upd, base } = useStoryCtx();
   const { chapters } = useChapters(story.id);
   const [view, setView] = useState<'board' | 'timeline' | 'structure' | 'outline'>('board');
@@ -93,7 +96,7 @@ export default function Plot() {
               <div className="arc-tools">
                 <button className="icon-btn tiny" title="Move arc left" onClick={() => upd((s) => move(s.arcs, ai, ai - 1))}>←</button>
                 <button className="icon-btn tiny" title="Move arc right" onClick={() => upd((s) => move(s.arcs, ai, ai + 1))}>→</button>
-                <button className="icon-btn tiny danger" title="Delete arc" onClick={() => confirm(`Delete arc “${arc.title}” and its ${arc.points.length} plot points?`) && upd((s) => void s.arcs.splice(ai, 1))}>🗑</button>
+                <button className="icon-btn tiny danger" title="Delete arc" onClick={() => confirm(`Delete arc “${arc.title}” and its ${arc.points.length} plot points? It goes to the bin for 30 days.`) && update((d) => trashItem(d, story.id, 'arcs', arc.id))}>🗑</button>
               </div>
 
               <div className="points">
@@ -150,6 +153,7 @@ function chapterBadge(p: PlotPoint, chapters: Chapter[]) {
 }
 
 function PointEditor({ story, chapters, ai, pi, onClose }: { story: Story; chapters: Chapter[]; ai: number; pi: number; onClose: () => void }) {
+  const { update } = useLibrary();
   const { upd } = useStoryCtx();
   const p = story.arcs[ai].points[pi];
   const set = (fn: (p: PlotPoint) => void) => upd((s) => fn(s.arcs[ai].points[pi]));
@@ -197,7 +201,7 @@ function PointEditor({ story, chapters, ai, pi, onClose }: { story: Story; chapt
         )}
         <button className="icon-btn" title="Move up" onClick={() => upd((s) => move(s.arcs[ai].points, pi, pi - 1))}>↑</button>
         <button className="icon-btn" title="Move down" onClick={() => upd((s) => move(s.arcs[ai].points, pi, pi + 1))}>↓</button>
-        <button className="icon-btn danger" title="Delete" onClick={() => { if (confirm('Delete this plot point?')) { upd((s) => void s.arcs[ai].points.splice(pi, 1)); onClose(); } }}>🗑</button>
+        <button className="icon-btn danger" title="Delete" onClick={() => { if (confirm('Delete this plot point? It goes to the bin for 30 days.')) { update((d) => trashPlotPoint(d, story.id, p.id)); onClose(); } }}>🗑</button>
         <span style={{ flex: 1 }} />
         <button className="btn small primary" onClick={onClose}>Done</button>
       </div>

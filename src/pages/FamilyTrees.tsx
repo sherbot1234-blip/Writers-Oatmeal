@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useStoryCtx } from '../storyContext';
 import { Avatar, ColorPick, Empty, Field, Modal } from '../components/ui';
 import { groupCharacters } from '../categories';
+import { trashItem } from '../trash';
+import { useLibrary } from '../store';
 import { uid } from '../util';
 import type { FamilyTree, LineStyle, Story, TreeLink, TreeLineType, TreeNode } from '../types';
 import { palette } from './Library';
@@ -70,6 +72,7 @@ export default function FamilyTrees() {
 type Sel = { kind: 'node' | 'link'; id: string } | null;
 
 function TreeEditor({ story, ti, tree, onDeleted }: { story: Story; ti: number; tree: FamilyTree; onDeleted: () => void }) {
+  const { update } = useLibrary();
   const { upd, base } = useStoryCtx();
   const [zoom, setZoom] = useState(1);
   const [lineType, setLineType] = useState(story.treeLineTypes[0]?.id ?? '');
@@ -202,7 +205,7 @@ function TreeEditor({ story, ti, tree, onDeleted }: { story: Story; ti: number; 
           style={{ marginTop: 16 }}
           onClick={() => {
             if (!confirm(`Delete the tree “${tree.name}”? Your characters are not affected.`)) return;
-            upd((s) => void s.trees.splice(ti, 1));
+            update((d) => trashItem(d, story.id, 'trees', tree.id, tree.name));
             onDeleted();
           }}
         >

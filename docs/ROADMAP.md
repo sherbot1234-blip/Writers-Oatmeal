@@ -31,6 +31,8 @@ Each story looks completely different from the others. **Milanote** stays my mai
 - [x] Style packs (Game HUD with Whimsy ↔ Dark moods, Field Journal, Case File, Parchment Scroll, Gothic, Cute Pastel, Comic Book, Starlight, Clean), fine-tuning of cards, textures, headings, ornaments, banner, second mood; custom pages from templates; cosier default look
 - [x] Tweaks after first use: character categories (multi-category, grouped + tabs, used in cast lists), faster relationships (only added ones, mutual by default, one-click type picking, bulk add, timeline tucked into Details), hand-made family trees on a free canvas (several per story, name-only people, custom line types, notes), one Milanote board field per story shown everywhere
 - [x] Pictures: adjust (move / zoom / fill or show whole) everywhere without changing the original; drag & drop from the computer or other websites (with a link fallback); saving made instant with a safety net when leaving the page
+- [x] Cleanup: recently-deleted bin (30 days, restore everything), select mode for bulk delete on the bookshelf and characters, side-by-side character merge; sync combines edits from different devices and tabs instead of making conflict copies
+- [x] Relationships by POV: you choose who gets a chart; each POV has Cards and a draggable Chart (lines to the POV and between others)
 - [x] Universes / series: series order, shared characters (edit once, shows in every story), universe-level world, songs and relationships
 
 ## Next, in order

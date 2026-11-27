@@ -1,4 +1,4 @@
-import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, TreeLineType, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
+import type { Arc, Chapter, ChapterStatus, FamilyRole, Structure, TrashItem, TreeLineType, Library, MeterDef, Moment, StoryStatus, Question, RelType, Section, SectionKind, Story, TabConfig, Theme } from './types';
 import { uid } from './util';
 
 export const THEME_BASE = { card: 'soft', texture: 'none', ornament: '', headingCase: 'normal', mood: 'main', mainName: 'Light', altName: 'Dark' } as const;
@@ -248,6 +248,8 @@ export function makeStory(title = 'Untitled Story', theme?: Theme): Story {
     relationships: [],
     charCategories: [],
     charCategoryMap: {},
+    relPovs: [],
+    relCharts: {},
     trees: [],
     treeLineTypes: defaultLineTypes(),
     milanoteUrl: '',
@@ -282,7 +284,7 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (s.kind !== 'universe') s.kind = 'story';
   if (!STATUSES.some((x) => x.key === s.status)) s.status = 'planning';
   if (typeof s.seriesOrder !== 'number') s.seriesOrder = 0;
-  for (const k of ['charCategories', 'trees', 'treeLineTypes', 'customPages', 'lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
+  for (const k of ['relPovs', 'charCategories', 'trees', 'treeLineTypes', 'customPages', 'lore', 'loreCategories', 'events', 'glossary', 'sharedCharacterIds', 'genres', 'links', 'songs', 'characters', 'relTypes', 'relationships', 'arcs', 'worldImages', 'questions', 'characterTemplate'] as const) {
     if (!Array.isArray(s[k])) (s as any)[k] = (base as any)[k];
   }
   if (!s.id) s.id = uid();
@@ -294,6 +296,12 @@ export function normalizeStory(raw: Partial<Story>): Story {
   if (!Array.isArray(s.relMeters)) s.relMeters = defaultMeters();
   if (!s.characterArcs || typeof s.characterArcs !== 'object') s.characterArcs = {};
   if (!s.charCategoryMap || typeof s.charCategoryMap !== 'object') s.charCategoryMap = {};
+  if (!s.relCharts || typeof s.relCharts !== 'object') s.relCharts = {};
+  if (!Array.isArray(raw.relPovs)) {
+    // before POV charts existed: give a chart to everyone who already has relationships, so nothing disappears
+    const ids = new Set((raw.relationships ?? []).flatMap((r: any) => [r.from, r.to]));
+    s.relPovs = (raw.characters ?? []).map((c) => c.id).filter((id) => ids.has(id));
+  }
   if (!s.treeLineTypes.length) s.treeLineTypes = defaultLineTypes();
   if (typeof raw.milanoteUrl !== 'string') {
     // pull a Milanote board out of the old links list into its own field
@@ -339,7 +347,7 @@ export const defaultLineTypes = (): TreeLineType[] => [
 ];
 
 export function emptyLibrary(): Library {
-  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], chapters: [], metaUpdatedAt: 0, tombstones: {} };
+  return { version: 1, siteTitle: "Writer's Oatmeal", stories: [], universes: [], chapters: [], trash: [], metaUpdatedAt: 0, tombstones: {} };
 }
 
 export function normalizeLibrary(raw: unknown): Library | null {
@@ -351,6 +359,8 @@ export function normalizeLibrary(raw: unknown): Library | null {
     siteTitle: r.siteTitle || "Writer's Oatmeal",
     stories: r.stories.map(normalizeStory),
     chapters: Array.isArray(r.chapters) ? r.chapters.map(normalizeChapter) : [],
+    trash: Array.isArray(r.trash) ? r.trash.filter(Boolean).map(normalizeTrash) : [],
+    savedAt: typeof r.savedAt === 'number' ? r.savedAt : undefined,
     universes: Array.isArray(r.universes) ? r.universes.map((u) => ({ ...normalizeStory(u), kind: 'universe' as const })) : [],
     metaUpdatedAt: typeof r.metaUpdatedAt === 'number' ? r.metaUpdatedAt : 0,
     tombstones: r.tombstones && typeof r.tombstones === 'object' ? r.tombstones : {},
@@ -460,4 +470,10 @@ export function makeStructure(templateId: string): Structure {
   const t = STRUCTURES.find((x) => x.id === templateId);
   if (!t) return { templateId: 'custom', name: 'My structure', beats: [{ id: uid(), name: 'Beginning', guide: '', pct: 0, notes: '', pointIds: [] }] };
   return { templateId: t.id, name: t.name, beats: t.beats.map(([name, pct, guide]) => ({ id: uid(), name, pct, guide, notes: '', pointIds: [] })) };
+}
+
+export const TRASH_DAYS = 30;
+
+export function normalizeTrash(raw: Partial<TrashItem>): TrashItem {
+  return { id: raw.id ?? uid(), kind: raw.kind ?? 'item', title: raw.title ?? 'Untitled', what: raw.what ?? 'Item', deletedAt: raw.deletedAt ?? Date.now(), updatedAt: raw.updatedAt ?? Date.now(), payload: raw.payload, storyId: raw.storyId, storyTitle: raw.storyTitle };
 }
